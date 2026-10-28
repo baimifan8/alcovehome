@@ -6,3 +6,4 @@ phase0/floorplan/images/*
 !phase0/floorplan/images/.gitkeep
 phase0/furniture/screenshots/*
 !phase0/furniture/screenshots/.gitkeep
+dist/

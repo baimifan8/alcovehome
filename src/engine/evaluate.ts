@@ -34,6 +34,8 @@ export interface RoomInput {
 export interface EvaluateOptions {
   /** Skip the walkway check (tier 2), e.g. while an item is being dragged. */
   skipWalkway?: boolean;
+  /** How lengths appear in reason messages, e.g. in the user's units. Defaults to "30 in". */
+  format?: (inches: number) => string;
 }
 
 export interface ZoneStatus {
@@ -57,11 +59,12 @@ export interface RoomReport {
   };
 }
 
-const fmt = (inches: number) => `${Math.round(inches)} in`;
+export const formatInches = (inches: number) => `${Math.round(inches)} in`;
 const RANK: Record<Result, number> = { fits: 0, tight: 1, "doesnt-fit": 2 };
 
 export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOptions = {}): RoomReport {
   const { room } = input;
+  const fmt = options.format ?? formatInches;
   const outline: Poly = room.outline;
   const itemById = new Map(input.items.map((i) => [i.id, i]));
   const placed: PlacedItem[] = input.placements
@@ -78,7 +81,7 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
     if (status.every((s) => s === "outside")) {
       add(p.placement.id, { tier: 0, code: "outside-room", message: "is outside the room", related: [] });
     } else if (status.some((s) => s !== "inside")) {
-      add(p.placement.id, { tier: 0, code: "wall", message: wallMessage(p, room), related: [] });
+      add(p.placement.id, { tier: 0, code: "wall", message: wallMessage(p, room, fmt), related: [] });
     }
 
     for (const q of placed) {
@@ -130,7 +133,7 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
         add(p.placement.id, {
           tier: 1,
           code: "use-zone",
-          message: zoneMessage(zone, available, [...blockers]),
+          message: zoneMessage(zone, available, [...blockers], fmt),
           related: [],
         });
       }
@@ -166,14 +169,25 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
       targets,
       required,
     );
+    // One walkway reason per item, naming every destination it narrows the way to.
+    const blamed = new Map<string, WalkwayResult[]>();
     for (const r of results) {
       if (r.ok) continue;
-      const msg =
-        r.width === 0
-          ? `blocks the way from the ${entryShape.label} to ${r.label}`
-          : `narrows the walkway from the ${entryShape.label} to ${r.label} to ${fmt(r.width)} (needs ${fmt(required)})`;
-      for (const id of r.narrowedBy) add(id, { tier: 2, code: "walkway", message: msg, related: [r.targetId] });
+      for (const id of r.narrowedBy) blamed.set(id, [...(blamed.get(id) ?? []), r]);
       if (!r.narrowedBy.length) notes.push(`The walls leave only ${fmt(r.width)} between the ${entryShape.label} and ${r.label}.`);
+    }
+    for (const [id, rs] of blamed) {
+      const width = Math.min(...rs.map((r) => r.width));
+      const to = listJoin(rs.map((r) => r.label));
+      add(id, {
+        tier: 2,
+        code: "walkway",
+        message:
+          width === 0
+            ? `blocks the way from the ${entryShape.label} to ${to}`
+            : `narrows the walkway to ${fmt(width)} (needs ${fmt(required)}) between the ${entryShape.label} and ${to}`,
+        related: rs.map((r) => r.targetId),
+      });
     }
   }
   if (!options.skipWalkway && !entry && placed.length) {
@@ -215,13 +229,17 @@ export function worse(a: Result, b: Result): boolean {
   return RANK[a] > RANK[b];
 }
 
+function listJoin(xs: string[]): string {
+  return xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+}
+
 function maxOverlap(a: Poly[], b: Poly[]): number {
   let m = 0;
   for (const p of a) for (const q of b) m = Math.max(m, overlapDepth(p, q));
   return m;
 }
 
-function wallMessage(p: PlacedItem, room: Room): string {
+function wallMessage(p: PlacedItem, room: Room, fmt: (inches: number) => string): string {
   // How far the deepest outside corner sticks out, and through which wall.
   let worst = 0;
   let wallName = "";
@@ -275,7 +293,12 @@ function zoneBlockers(polys: Poly[], outline: Poly, others: PlacedItem[]): strin
   return [...out];
 }
 
-function zoneMessage(zone: ZoneShape, available: Record<string, number>, blockers: string[]): string {
+function zoneMessage(
+  zone: ZoneShape,
+  available: Record<string, number>,
+  blockers: string[],
+  fmt: (inches: number) => string,
+): string {
   const need = fmt(zone.depth);
   const by = blockers.length ? ` (${blockers.join(", ")})` : "";
   const sides = Object.entries(available);

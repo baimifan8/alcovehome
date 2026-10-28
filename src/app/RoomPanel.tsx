@@ -1,0 +1,224 @@
+import type { Dispatch } from "react";
+import type { Opening, Room, Space } from "../model/types.ts";
+import type { Units } from "../model/units.ts";
+import { LengthInput } from "./LengthInput.tsx";
+import { newOpening, rectRoom, resizeRoom, roomSize, type Action } from "./store.ts";
+
+const WALLS = ["Top", "Right", "Bottom", "Left"];
+const TYPES: { type: Opening["type"]; label: string }[] = [
+  { type: "door", label: "Door" },
+  { type: "closet_door", label: "Closet door" },
+  { type: "window", label: "Window" },
+  { type: "passage", label: "Open doorway" },
+];
+
+interface Props {
+  space: Space;
+  room: Room | null;
+  units: Units;
+  dispatch: Dispatch<Action>;
+}
+
+export function RoomPanel({ space, room, units, dispatch }: Props) {
+  return (
+    <div className="panel-body">
+      <label className="field">
+        <span>Listing</span>
+        <input type="text" value={space.name} onChange={(e) => dispatch({ type: "updateSpace", space: { ...space, name: e.target.value } })} />
+      </label>
+
+      <div className="room-tabs" role="tablist" aria-label="Rooms">
+        {space.rooms.map((r) => (
+          <button
+            key={r.id}
+            role="tab"
+            aria-selected={r.id === room?.id}
+            className={r.id === room?.id ? "tab active" : "tab"}
+            onClick={() => dispatch({ type: "select", spaceId: space.id, roomId: r.id })}
+          >
+            {r.name || "Room"}
+          </button>
+        ))}
+        <button className="tab add" onClick={() => dispatch({ type: "addRoom", room: rectRoom(`Room ${space.rooms.length + 1}`, 120, 120) })}>
+          + Room
+        </button>
+      </div>
+
+      {room && <RoomEditor room={room} units={units} dispatch={dispatch} canDelete={space.rooms.length > 1} />}
+    </div>
+  );
+}
+
+function RoomEditor({ room, units, dispatch, canDelete }: { room: Room; units: Units; dispatch: Dispatch<Action>; canDelete: boolean }) {
+  const size = roomSize(room);
+  const update = (r: Room) => dispatch({ type: "updateRoom", room: r });
+  const setOpening = (o: Opening) => update({ ...room, openings: room.openings.map((x) => (x.id === o.id ? o : x)) });
+
+  return (
+    <>
+      <label className="field">
+        <span>Room name</span>
+        <input type="text" value={room.name} onChange={(e) => update({ ...room, name: e.target.value })} />
+      </label>
+      <div className="row">
+        <LengthInput label="Width (left to right)" value={size.width} units={units} bare="ft" min={24} onChange={(w) => update(resizeRoom(room, w, size.length))} />
+        <LengthInput label="Length (top to bottom)" value={size.length} units={units} bare="ft" min={24} onChange={(l) => update(resizeRoom(room, size.width, l))} />
+      </div>
+
+      <h3>Doors and windows</h3>
+      {room.openings.length === 0 && <p className="hint">Add the entry door so walkways can be checked.</p>}
+      {room.openings.map((o, i) => (
+        <OpeningEditor
+          key={o.id}
+          index={i}
+          room={room}
+          opening={o}
+          units={units}
+          onChange={setOpening}
+          onDelete={() => update({ ...room, openings: room.openings.filter((x) => x.id !== o.id) })}
+          onMakeEntry={() => update({ ...room, openings: room.openings.map((x) => ({ ...x, entry: x.id === o.id })) })}
+        />
+      ))}
+      <div className="row wrap">
+        {TYPES.map((t) => (
+          <button key={t.type} className="secondary" onClick={() => update({ ...room, openings: [...room.openings, newOpening(t.type, room)] })}>
+            + {t.label}
+          </button>
+        ))}
+      </div>
+
+      {canDelete && (
+        <button className="danger" onClick={() => confirm(`Delete ${room.name}?`) && dispatch({ type: "deleteRoom", id: room.id })}>
+          Delete room
+        </button>
+      )}
+    </>
+  );
+}
+
+interface OpeningProps {
+  index: number;
+  room: Room;
+  opening: Opening;
+  units: Units;
+  onChange: (o: Opening) => void;
+  onDelete: () => void;
+  onMakeEntry: () => void;
+}
+
+/**
+ * Shown in plan terms (distance from the plan's left or top corner; hinge left/right
+ * or top/bottom on the plan) and stored in model terms (offset from the wall's start
+ * vertex; hinge as seen from inside the room).
+ */
+function OpeningEditor({ room, opening: o, units, onChange, onDelete, onMakeEntry }: OpeningProps) {
+  const size = roomSize(room);
+  const horizontal = o.wall % 2 === 0;
+  const wallLen = horizontal ? size.width : size.length;
+  const startsAtPlanCorner = o.wall === 0 || o.wall === 1;
+  const fromCorner = startsAtPlanCorner ? o.offset : wallLen - o.offset - o.width;
+  const toOffset = (d: number, width: number) => {
+    const clamped = Math.max(0, Math.min(d, wallLen - width));
+    return startsAtPlanCorner ? clamped : wallLen - clamped - width;
+  };
+  const planHinge = (o.hinge === "left") === startsAtPlanCorner ? "first" : "second";
+  const isDoor = o.type === "door" || o.type === "closet_door";
+  const canBeEntry = o.type === "door" || o.type === "passage";
+  const entryId = room.openings.find((x) => x.entry && (x.type === "door" || x.type === "passage"))?.id ?? room.openings.find((x) => x.type === "door" || x.type === "passage")?.id;
+
+  return (
+    <fieldset className="opening">
+      <legend>
+        <select value={o.type} aria-label="Type" onChange={(e) => onChange({ ...o, type: e.target.value as Opening["type"] })}>
+          {TYPES.map((t) => (
+            <option key={t.type} value={t.type}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        {canBeEntry && (
+          <label className="inline">
+            <input type="radio" name={`entry-${room.id}`} checked={entryId === o.id} onChange={onMakeEntry} /> Entry
+          </label>
+        )}
+        <button className="link" onClick={onDelete} aria-label="Remove">
+          Remove
+        </button>
+      </legend>
+      <div className="row">
+        <label className="field">
+          <span>Wall</span>
+          <select
+            value={o.wall}
+            onChange={(e) => {
+              const wall = Number(e.target.value);
+              const len = wall % 2 === 0 ? size.width : size.length;
+              const width = Math.min(o.width, len);
+              onChange({ ...o, wall, width, offset: Math.max(0, Math.min(o.offset, len - width)) });
+            }}
+          >
+            {WALLS.map((w, i) => (
+              <option key={w} value={i}>
+                {w}
+              </option>
+            ))}
+          </select>
+        </label>
+        <LengthInput
+          label={`From ${horizontal ? "left" : "top"} corner`}
+          value={fromCorner}
+          units={units}
+          bare="in"
+          onChange={(d) => onChange({ ...o, offset: toOffset(d, o.width) })}
+        />
+        <LengthInput
+          label="Width"
+          value={o.width}
+          units={units}
+          bare="in"
+          min={1}
+          onChange={(w) => {
+            const width = Math.min(w, wallLen);
+            onChange({ ...o, width, offset: toOffset(fromCorner, width) });
+          }}
+        />
+      </div>
+      {isDoor && (
+        <div className="row">
+          <label className="field">
+            <span>Opens by</span>
+            <select value={o.operation} onChange={(e) => onChange({ ...o, operation: e.target.value as Opening["operation"] })}>
+              <option value="swing">Swinging</option>
+              <option value="sliding">Sliding</option>
+              <option value="bifold">Bifold</option>
+            </select>
+          </label>
+          {o.operation === "swing" && (
+            <>
+              <label className="field">
+                <span>Swings</span>
+                <select value={o.swing} onChange={(e) => onChange({ ...o, swing: e.target.value as Opening["swing"] })}>
+                  <option value="in">Into room</option>
+                  <option value="out">Out of room</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Hinge</span>
+                <select
+                  value={planHinge}
+                  onChange={(e) => {
+                    const first = e.target.value === "first";
+                    onChange({ ...o, hinge: first === startsAtPlanCorner ? "left" : "right" });
+                  }}
+                >
+                  <option value="first">{horizontal ? "Left" : "Top"}</option>
+                  <option value="second">{horizontal ? "Right" : "Bottom"}</option>
+                </select>
+              </label>
+            </>
+          )}
+        </div>
+      )}
+    </fieldset>
+  );
+}
