@@ -1,73 +1,42 @@
 # Alcove Home
 
-Will the furniture you already own fit in this home? Type a room's size from a listing, add your furniture, and get a fits / tight / doesn't-fit verdict for every piece, with the reason.
+**Find out if your furniture fits before you move.**
 
-See SPEC.md for the product spec and phased plan.
+Looking at an apartment or a house? Alcove Home tells you whether the furniture you already own will fit. You don't have to measure anything twice. Enter the room sizes from the listing, add your furniture once, and every piece gets a clear answer:
 
-## Status
+- ✅ **Fits:** plenty of room.
+- ⚠️ **Tight:** it goes in, but something is cramped. For example, there isn't enough space to pull out a desk chair, or the path to the closet is narrow.
+- ❌ **Doesn't fit:** it hits a wall, another piece of furniture, or a door.
 
-| Phase | State |
-| --- | --- |
-| 0 · Proof tests | Harness built, not yet run (needs screenshots, retailer links and an API key). See [`phase0/README.md`](phase0/README.md). |
-| 1 · 2D planner and fit engine | Built. **Gate passed:** all 27 golden cases pass. |
-| 2 · Floor plan import | Not started. |
-| 3 · Furniture import | Not started. |
+Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind it but only has 2½."*
 
-## Run it
+## What you can do today
 
-```bash
-npm install
-```
+- **Draw a room** by typing its width and length from the listing, in feet and inches or in centimeters.
+- **Mark the doors, closets and windows** so the app knows which spaces must stay clear.
+- **Add your furniture** from a list of common pieces (beds, desks, sofas, dressers…) or type in your own sizes. Corner sofas and L-shaped desks work too.
+- **Move things around** by dragging them on the floor plan and turning them. Pieces line up neatly against walls and each other.
+- **Get suggestions.** If something doesn't fit, the app can suggest a small move or a turn that would help.
+- **Keep several listings.** Your furniture list is saved once and reused for every home you look at.
+- **Use it on your phone or computer.** It opens in a web browser, and you can add it to your home screen like an app. No sign-up. Your plans stay on your own device.
 
-```bash
-npm run dev
-```
+## What's coming next
 
-```bash
-npm test
-```
+1. **Read floor plans from a picture.** Paste a screenshot of a listing's floor plan instead of typing room sizes.
+2. **Add furniture from a store link.** Paste a link to the product page and the app picks up the sizes for you.
+3. **Share a plan.** Send someone a link to see your layout.
 
-```bash
-npm run build
-```
+Before building steps 1 and 2, we're running small experiments to see how well a computer can read floor plans and store pages. Those haven't run yet; they're waiting on sample floor plans and store links.
 
-`npm run build` typechecks and builds the installable web app (PWA) into `dist/`.
+## Progress
 
-## What Phase 1 does
-
-- **Rooms:** typed width × length (`11' 2"`, `134 in`, `340 cm`, or a bare number read as feet), plus doors, closet doors, windows and open doorways with wall, position, width, swing direction and hinge side. Several rooms per listing, several listings.
-- **Furniture:** a saved inventory reused across listings. Add common items with typical sizes (`src/data/library.json`) or enter your own, including L-shaped sectionals and corner desks.
-- **Arrange:** drag to move, drag the handle to rotate (15° steps), snapping flush to walls and other pieces (hold Alt for free movement). Keyboard: arrows nudge 1 in (Shift: 6 in), R rotates 90°, Delete removes.
-- **Verdicts:** every piece shows fits / tight / doesn't fit with reasons ("chair pull-out needs 36 in, has 30 in (box)", "narrows the walkway to 28 in (needs 30 in) between the entry door and the closet door"). The narrowest point of a failing walkway is marked on the plan. "Suggest a fix" proposes a rotation or small move.
-- **Settings:** feet/inches or centimeters; every clearance is editable.
-- **Local-first:** everything is saved in the browser (`localStorage`); no account. Works offline once loaded, and can be added to the home screen.
-
-## Fit engine
-
-`src/engine/` holds pure functions: `evaluateRoom({ room, items, placements }, rules)` returns verdicts and doesn't touch its input. Clearances and each item type's use zones live in `src/engine/rules.json`, not in code.
-
-| Tier | Rule | Result |
+| Stage | What it means | Status |
 | --- | --- | --- |
-| 0 | Crosses a wall or is outside the room; overlaps another piece; inside a door's swing arc or the strip kept clear in front of a doorway or closet | Doesn't fit |
-| 1 | A use zone (desk chair pull-out, dresser drawers, bed side access on at least one side, sofa legroom, dining chairs, wardrobe doors) is cut by a wall or another piece | Tight |
-| 2 | The walkway from the entry to another door or to a clear use zone is under the minimum (30 in) | Tight |
-| 3 | Suggestions | Never change a verdict |
+| Experiments | Can a computer read floor plans and store pages well enough? | Ready to run, waiting on samples |
+| Room planner | Type room sizes, place furniture, get answers | ✅ Done and checked |
+| Floor plans from pictures | Paste a screenshot instead of typing | Not started |
+| Furniture from store links | Paste a link instead of typing sizes | Not started |
 
-Verdicts that depend on an inferred wall or an unconfirmed door are marked **approximate**.
+## For developers
 
-The golden cases in `src/engine/golden/cases/` were written before the engine (see the commit history) and are the Phase 1 gate. Their conventions are in [`src/engine/golden/README.md`](src/engine/golden/README.md).
-
-### Interpretations worth reviewing
-
-The spec left these open, so the engine makes a call on each. They're easy to change:
-
-- **Main walkway** means: from the entry door (the one marked Entry, else the first door) to every other door and to every use zone that is clear. A 30 in wide path has to get within 15 in of the target. Zones that are already blocked (tier 1) aren't checked again.
-- **Blame for a narrow walkway** goes to the pieces whose removal would widen it, not to everything along the route.
-- **Doorway strip:** 12 in in front of every door, closet door and open doorway is kept clear (tier 0), on top of a swinging door's arc. Bifold doors keep clear a quarter of their width if that's larger.
-- **Clearances the spec didn't give:** sofa legroom 14 in, dining chair pull-out 36 in, wardrobe doors 30 in.
-- **Approximate** covers a piece within the walkway width (or its deepest use zone) of an inferred wall, or within door width plus walkway width of an unconfirmed opening.
-- Walkway widths are measured on a 0.5 in grid and are accurate to about ±0.5 in.
-
-### Not in Phase 1
-
-Share links, add-ons and overrides (data model only), floor plan and product-link import (Phases 2–3), round tables.
+Setup, testing and how the fit checks work are in [DEVELOPERS.md](DEVELOPERS.md). The full product plan is in SPEC.md.
