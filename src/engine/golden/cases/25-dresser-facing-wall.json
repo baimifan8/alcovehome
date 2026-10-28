@@ -1,0 +1,4 @@
+{ "name": "Dresser facing a wall 21 in away: drawers need 36 in, so tight (walkway to a blocked zone is not double-counted)",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [{ "id": "dresser", "kind": "dresser", "width": 48, "depth": 18, "x": 72, "y": 30, "rotation": 180 }],
+  "expect": { "dresser": { "result": "tight", "codes": ["use-zone"] } } }

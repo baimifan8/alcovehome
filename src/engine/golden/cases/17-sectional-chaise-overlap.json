@@ -1,0 +1,10 @@
+{ "name": "Table overlapping the chaise: both don't fit, and the table also cuts the chaise's legroom",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [
+    { "id": "sofa", "kind": "sofa", "width": 100, "depth": 36,
+      "footprint": { "shape": "l", "side": "left", "returnWidth": 36, "returnDepth": 66 },
+      "x": 50, "y": 33, "rotation": 0 },
+    { "id": "table", "kind": "table", "width": 30, "depth": 20, "x": 35, "y": 66, "rotation": 0 }],
+  "expect": {
+    "sofa": { "result": "doesnt-fit", "codes": ["item-overlap", "use-zone"] },
+    "table": { "result": "doesnt-fit", "codes": ["item-overlap"] } } }

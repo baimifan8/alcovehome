@@ -1,0 +1,12 @@
+{ "name": "L-shaped room: outside the notch, crossing the inner corner (all corners inside), and fitting",
+  "room": { "outline": [[0,0],[144,0],[144,60],[72,60],[72,120],[0,120]], "openings": [] },
+  "items": [
+    { "id": "in-notch", "kind": "generic", "width": 20, "depth": 20, "x": 110, "y": 90, "rotation": 0 },
+    { "id": "over-corner", "kind": "generic", "width": 20, "depth": 20, "x": 80, "y": 62, "rotation": 0 },
+    { "id": "diagonal", "kind": "generic", "width": 28.2842712, "depth": 4, "x": 72, "y": 60, "rotation": 315 },
+    { "id": "ok", "kind": "generic", "width": 20, "depth": 20, "x": 100, "y": 30, "rotation": 0 }],
+  "expect": {
+    "in-notch": { "result": "doesnt-fit", "codes": ["outside-room"] },
+    "over-corner": { "result": "doesnt-fit", "codes": ["wall"] },
+    "diagonal": { "result": "doesnt-fit", "codes": ["wall"] },
+    "ok": { "result": "fits", "codes": [] } } }

@@ -1,0 +1,4 @@
+{ "name": "Same divider leaving exactly 30 in fits",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}, {"id":"closet","type":"closet_door","wall":"top","offset":100,"width":40,"operation":"sliding"}] },
+  "items": [{ "id": "divider", "kind": "generic", "width": 114, "depth": 20, "x": 87, "y": 60, "rotation": 0 }],
+  "expect": { "divider": { "result": "fits", "codes": [] } } }

@@ -1,0 +1,4 @@
+{ "name": "Bookshelf leaves only 28 in in front of the closet: not blocked, but under the 30 in walkway",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}, {"id":"closet","type":"closet_door","wall":"top","offset":40,"width":60,"operation":"sliding"}] },
+  "items": [{ "id": "shelf", "kind": "bookshelf", "width": 80, "depth": 12, "x": 70, "y": 34, "rotation": 0 }],
+  "expect": { "shelf": { "result": "tight", "codes": ["walkway"] } } }

@@ -1,0 +1,4 @@
+{ "name": "Furniture in front of a window is fine",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}, {"id":"window","type":"window","wall":"top","offset":40,"width":40}] },
+  "items": [{ "id": "dresser", "kind": "dresser", "width": 60, "depth": 18, "x": 60, "y": 9, "rotation": 0 }],
+  "expect": { "dresser": { "result": "fits", "codes": [] } } }

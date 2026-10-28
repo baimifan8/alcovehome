@@ -1,0 +1,5 @@
+{ "name": "Clearances come from rules data: with a 28 in walkway minimum, the 29 in gap fits",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}, {"id":"closet","type":"closet_door","wall":"top","offset":100,"width":40,"operation":"sliding"}] },
+  "clearances": { "mainWalkway": 28 },
+  "items": [{ "id": "divider", "kind": "generic", "width": 115, "depth": 20, "x": 86.5, "y": 60, "rotation": 0 }],
+  "expect": { "divider": { "result": "fits", "codes": [] } } }

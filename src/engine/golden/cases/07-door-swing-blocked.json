@@ -1,0 +1,4 @@
+{ "name": "Box inside the entry door's swing arc (hinge at x=6, 32 in door) but clear of the doorway strip",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [{ "id": "box", "kind": "generic", "width": 20, "depth": 20, "x": 10, "y": 90, "rotation": 0 }],
+  "expect": { "box": { "result": "doesnt-fit", "codes": ["door"] } } }

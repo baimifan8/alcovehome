@@ -1,0 +1,4 @@
+{ "name": "Touching two walls exactly is not an overlap",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [{ "id": "dresser", "kind": "dresser", "width": 60, "depth": 18, "x": 30, "y": 9, "rotation": 0 }],
+  "expect": { "dresser": { "result": "fits", "codes": [] } } }

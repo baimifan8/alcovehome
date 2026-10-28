@@ -1,0 +1,4 @@
+{ "name": "Bookshelf right in front of a sliding closet door (within the 12 in doorway strip)",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}, {"id":"closet","type":"closet_door","wall":"top","offset":40,"width":60,"operation":"sliding"}] },
+  "items": [{ "id": "shelf", "kind": "bookshelf", "width": 36, "depth": 12, "x": 68, "y": 6, "rotation": 0 }],
+  "expect": { "shelf": { "result": "doesnt-fit", "codes": ["closet-door"] } } }
