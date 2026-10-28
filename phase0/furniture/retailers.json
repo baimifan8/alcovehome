@@ -1,0 +1,16 @@
+{
+  "_instructions": "Paste 2-3 real product page URLs per retailer (mix: a desk, a bed or dresser, and one L-shaped sectional or corner desk where the retailer sells one). Fill `truth` by reading the assembled dimensions off the page yourself, in inches; leave it null to skip accuracy scoring for that item. Optionally save a screenshot of the specs section to furniture/screenshots/ and name it in `screenshot` to test the fallback path.",
+  "retailers": [
+    { "retailer": "IKEA", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "Wayfair", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "Amazon", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "Target", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "West Elm", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "Walmart", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "Home Depot", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "Pottery Barn", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "CB2 / Crate & Barrel", "products": [{ "url": "", "truth": null, "screenshot": null }] },
+    { "retailer": "Article", "products": [{ "url": "", "truth": null, "screenshot": null }] }
+  ],
+  "_truth_example": { "width_in": 55.1, "depth_in": 23.6, "height_in": 29.5, "shape": "rectangle" }
+}

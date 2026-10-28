@@ -1,0 +1,8 @@
+node_modules/
+.env
+
+# Listing screenshots and product screenshots are third-party images; keep them local.
+phase0/floorplan/images/*
+!phase0/floorplan/images/.gitkeep
+phase0/furniture/screenshots/*
+!phase0/furniture/screenshots/.gitkeep
