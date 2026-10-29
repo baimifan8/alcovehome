@@ -1,5 +1,6 @@
 // World-space shapes for items, their use zones, walls and openings.
 
+import { effectiveItem } from "../model/size.ts";
 import type { InventoryItem, Opening, Placement, Point, Room } from "../model/types.ts";
 import { add, rectPoly, rotate, scale, sub, unit, type Poly } from "./geometry.ts";
 import { clearance, kindRule, type Rules, type Side, type ZoneRule } from "./rules.ts";
@@ -12,7 +13,8 @@ export interface LocalRect {
   d: number;
 }
 
-export function localRects(item: InventoryItem): LocalRect[] {
+export function localRects(raw: InventoryItem): LocalRect[] {
+  const item = effectiveItem(raw);
   const main = { x: 0, y: 0, w: item.width, d: item.depth };
   const fp = item.footprint;
   if (fp.shape !== "l" || fp.returnDepth <= item.depth || fp.returnWidth <= 0) return [main];
@@ -21,7 +23,8 @@ export function localRects(item: InventoryItem): LocalRect[] {
 }
 
 /** Overall bounding box of the footprint in the item's own frame. */
-export function bboxSize(item: InventoryItem) {
+export function bboxSize(raw: InventoryItem) {
+  const item = effectiveItem(raw);
   const fp = item.footprint;
   return { w: item.width, d: fp.shape === "l" ? Math.max(item.depth, fp.returnDepth) : item.depth };
 }
@@ -44,7 +47,9 @@ export interface PlacedItem {
   toWorld: (p: Point) => Point;
 }
 
-export function placeItem(placement: Placement, item: InventoryItem, rules: Rules): PlacedItem {
+/** `item` is folded to its effective size (overrides and add-ons), and kept that way on the result. */
+export function placeItem(placement: Placement, raw: InventoryItem, rules: Rules): PlacedItem {
+  const item = effectiveItem(raw);
   const rects = localRects(item);
   const box = bboxSize(item);
   const toWorld = (p: Point) =>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InventoryItem, Placement, Room } from "../model/types.ts";
 import { containment, overlapDepth, rectPoly } from "./geometry.ts";
-import { defaultRules, evaluateRoom, suggest } from "./index.ts";
+import { bboxSize, defaultRules, evaluateRoom, suggest } from "./index.ts";
 
 const room: Room = {
   id: "r",
@@ -97,5 +97,29 @@ describe("suggest (tier 3)", () => {
   it("offers nothing for an item that already fits", () => {
     const ok: Placement[] = [{ ...placements[0], x: 72 }];
     expect(suggest({ room, items, placements: ok }, defaultRules, "p", "Desk")).toEqual([]);
+  });
+});
+
+describe("overrides and add-ons", () => {
+  const base = item("desk", "desk", 48, 24);
+  const at = (x: number): Placement[] => [{ id: "p", itemId: "desk", roomId: "r", x, y: 12, rotation: 0 }];
+
+  it("uses the user's own size instead of the store's", () => {
+    // 48 in wide flush against the left wall at x = 24 fits; 60 in wide crosses it.
+    const mine = { ...base, overrides: { width: 60 } };
+    expect(evaluateRoom({ room, items: [base], placements: at(24) }, defaultRules).verdicts[0].result).toBe("fits");
+    expect(evaluateRoom({ room, items: [mine], placements: at(24) }, defaultRules).verdicts[0].reasons.map((r) => r.code)).toContain("wall");
+  });
+
+  it("adds switched-on add-ons to the size, and ignores switched-off ones", () => {
+    const leaf = { id: "a", label: "leaf", width: 18, depth: 0, height: 0, on: true };
+    expect(evaluateRoom({ room, items: [{ ...base, addOns: [leaf] }], placements: at(24) }, defaultRules).verdicts[0].result).toBe("doesnt-fit");
+    expect(evaluateRoom({ room, items: [{ ...base, addOns: [{ ...leaf, on: false }] }], placements: at(24) }, defaultRules).verdicts[0].result).toBe("fits");
+  });
+
+  it("keeps an L-shaped piece's return when depth grows", () => {
+    const sofa: InventoryItem = { ...item("s", "sofa", 100, 36), footprint: { shape: "l", side: "left", returnWidth: 36, returnDepth: 66 } };
+    const deeper = { ...sofa, addOns: [{ id: "a", label: "deeper cushions", width: 0, depth: 4, height: 0, on: true }] };
+    expect(bboxSize(deeper)).toEqual({ w: 100, d: 70 });
   });
 });

@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "phase0", "vite.config.ts"]
+  "include": ["src", "phase0", "server", "vite.config.ts"]
 }

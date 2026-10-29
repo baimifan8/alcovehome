@@ -7,3 +7,4 @@ phase0/floorplan/images/*
 phase0/furniture/screenshots/*
 !phase0/furniture/screenshots/.gitkeep
 dist/
+server/data/

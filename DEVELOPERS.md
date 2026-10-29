@@ -11,7 +11,7 @@ See SPEC.md for the product spec and phased plan.
 | 0 · Proof tests | Harness built, not yet run (needs screenshots, retailer links and an API key). See [`phase0/README.md`](phase0/README.md). |
 | 1 · 2D planner and fit engine | Built. **Gate passed:** all 27 golden cases pass. |
 | 2 · Floor plan import | Built. Gate ("a real listing screenshot becomes a confirmed layout") **not yet met**: verified end to end with a sample plan and a recorded reading, not with a real screenshot and live Claude call. |
-| 3 · Furniture import | Not started. |
+| 3 · Furniture import | Built. Gate ("a new user goes from screenshot to verdict in under 5 minutes") **not yet met**: the full path runs end to end in a browser with recorded readings (about 1 s of app time and 8 actions), but hasn't been timed with real people or live reading. |
 
 ## Run it
 
@@ -101,6 +101,25 @@ listing text ──parseListingText──▶ draftFromText ───────
 - Images are shrunk to 1568 px on the long side before sending, so the pixel positions Claude reports match the image the overlay draws on.
 - Not yet: PDF pages, non-rectangular rooms from images (the reading gives each room's bounding box), dragging doors on the overlay (positions are typed fields, as the spec asks).
 
+## Furniture import (Phase 3)
+
+```
+link ──normalize──▶ shared cache hit? ──yes──▶ confirm (saved, N agree)
+                         │no
+                         ▼
+               safeFetch ─blocked?──▶ screenshot ──Claude──▶ ProductReading ─┐
+                         │ok                                                  ├─draftFromProduct──▶ confirm ──▶ inventory + POST /confirm (cache)
+               pageText ──Claude──▶ ProductReading ───────────────────────────┘
+```
+
+- `src/import/product.ts`: `ProductReading` (Claude copies numbers **with their units**; code converts), `PRODUCT_SYSTEM`, `draftFromProduct` (issues: box sizes, missing numbers, an L with no return size, round/other shapes planned as their rectangle), `SavedProduct` (cache schema, validated on write), `normalizeProductUrl` (lowercase host, no `www`/fragment/tracking params, sorted query, Amazon → `/dp/ASIN`).
+- `server/safeFetch.ts`: the only way the server fetches user-supplied links. http(s) only, ports 80/443, no credentials in links, at most 5 redirects, 5 MB and 20 s limits, and a **connect-time DNS check that refuses private, loopback, link-local and reserved addresses** on every hop (no DNS-rebinding gap).
+- `server/pageText.ts`: bot-wall detection and page text (JSON-LD plus visible text). Pages over 150k characters keep JSON-LD whole and only the passages around size words; the server logs when that happens.
+- `server/productCache.ts`: a JSON file (`server/data/products.json`, or `$ALCOVE_DATA_DIR`). Confirming the same size again increments `confirmations`; a different size replaces the entry and resets the count. Cached results still go through the confirm step. There's no auth or rate limit yet, so anyone can overwrite an entry. Move it to a database with per-user limits before a public launch.
+- `src/model/size.ts`: `effectiveSize` / `effectiveItem` = override ?? base, plus add-ons that are on. Extra depth also deepens an L's return. The engine, snapping and placement all use the effective item (`placeItem`, `localRects`, `bboxSize`).
+- Store sizes are locked in the item editor. "Use my own size" sets `InventoryItem.overrides`, which is shown as "your size".
+- The Phase 0 store test now uses the same fetcher, page cleanup, prompt and conversion.
+
 ## Not built yet
 
-Share links, add-ons and overrides (data model only), product-link import (Phase 3), round tables.
+Share links, the browser extension, round tables (planned as their bounding rectangle), auth and rate limits for the shared product cache.
