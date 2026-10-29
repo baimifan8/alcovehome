@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { evaluateRoom } from "../engine/index.ts";
+import { saveImage, type PlanImage } from "../import/client.ts";
+import { draftToRoom, type DraftPlan, type DraftRoom } from "../import/draft.ts";
 import type { InventoryItem, Placement } from "../model/types.ts";
 import { formatLength } from "../model/units.ts";
 import { FurniturePanel } from "./FurniturePanel.tsx";
-import { LengthInput } from "./LengthInput.tsx";
+import { ConfirmPlan } from "./ConfirmPlan.tsx";
+import { NewListing } from "./NewListing.tsx";
 import { PlanView } from "./PlanView.tsx";
 import { RoomPanel } from "./RoomPanel.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
-import { findSpot, load, rectRoom, reducer, rulesFor, save } from "./store.ts";
+import { findSpot, load, newId, rectRoom, reducer, rulesFor, save } from "./store.ts";
 import { VerdictPanel } from "./VerdictPanel.tsx";
 
 export function App() {
@@ -17,6 +20,8 @@ export function App() {
   const [dragging, setDragging] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  /** A floor plan or listing text that has been read and is waiting to be checked. */
+  const [pending, setPending] = useState<{ name: string; draft: DraftPlan; image: PlanImage | null } | null>(null);
 
   useEffect(() => {
     if (dragging) return;
@@ -52,17 +57,51 @@ export function App() {
     document.querySelector(".plan")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
+  const startPlan = () => {
+    setCreating(false);
+    setPending(null);
+    setSelected(null);
+    setTab("room");
+  };
+
+  const confirmDraft = async (rooms: DraftRoom[]) => {
+    if (!pending) return;
+    const id = newId();
+    const saved = pending.image ? await saveImage(id, pending.image) : false;
+    dispatch({
+      type: "createSpace",
+      id,
+      name: pending.name,
+      rooms: rooms.map((r) => draftToRoom(r, newId())),
+      ...(saved ? { sourceImage: id } : {}),
+    });
+    startPlan();
+  };
+
+  if (pending) {
+    return (
+      <ConfirmPlan
+        name={pending.name}
+        draft={pending.draft}
+        image={pending.image}
+        units={units}
+        onBack={() => setPending(null)}
+        onConfirm={(rooms) => void confirmDraft(rooms)}
+      />
+    );
+  }
+
   if (!space || creating) {
     return (
-      <Welcome
+      <NewListing
         units={units}
         hasSpaces={state.spaces.length > 0}
         onCancel={() => setCreating(false)}
-        onCreate={(name, roomName, w, l) => {
-          dispatch({ type: "createSpace", name, room: rectRoom(roomName, w, l) });
-          setCreating(false);
-          setTab("room");
+        onTyped={(name, roomName, w, l) => {
+          dispatch({ type: "createSpace", name, rooms: [rectRoom(roomName, w, l)] });
+          startPlan();
         }}
+        onDraft={(name, draft, image) => setPending({ name, draft, image })}
       />
     );
   }
@@ -166,57 +205,6 @@ export function App() {
         onChange={(settings) => dispatch({ type: "settings", settings })}
         onClose={() => setSettingsOpen(false)}
       />
-    </div>
-  );
-}
-
-function Welcome({
-  units,
-  hasSpaces,
-  onCreate,
-  onCancel,
-}: {
-  units: "ftin" | "cm";
-  hasSpaces: boolean;
-  onCreate: (name: string, roomName: string, width: number, length: number) => void;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [roomName, setRoomName] = useState("Bedroom");
-  const [width, setWidth] = useState(144);
-  const [length, setLength] = useState(132);
-
-  return (
-    <div className="welcome">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onCreate(name.trim() || "My listing", roomName.trim() || "Room", width, length);
-        }}
-      >
-        <h1>Alcove Home</h1>
-        <p>Will the furniture you already own fit? Type a room's size from the listing, add your furniture, and get a verdict for every piece.</p>
-        <label className="field">
-          <span>Listing</span>
-          <input type="text" value={name} placeholder="e.g. 12 Elm St, Unit 3B" onChange={(e) => setName(e.target.value)} autoFocus />
-        </label>
-        <label className="field">
-          <span>First room</span>
-          <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)} />
-        </label>
-        <div className="row">
-          <LengthInput label="Width (left to right)" value={width} units={units} bare="ft" min={24} onChange={setWidth} />
-          <LengthInput label="Length (top to bottom)" value={length} units={units} bare="ft" min={24} onChange={setLength} />
-        </div>
-        <div className="row">
-          <button type="submit">Start plan</button>
-          {hasSpaces && (
-            <button type="button" className="secondary" onClick={onCancel}>
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
     </div>
   );
 }

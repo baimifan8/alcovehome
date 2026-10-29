@@ -20,6 +20,8 @@ export interface Room {
   /** One entry per wall, same order as outline. */
   wallSources: WallSource[];
   openings: Opening[];
+  /** True when the shape and doors are guesses (e.g. sizes from listing text only). */
+  approximate?: boolean;
 }
 
 export type OpeningType = "door" | "closet_door" | "window" | "passage";

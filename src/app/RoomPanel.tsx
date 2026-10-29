@@ -1,4 +1,5 @@
-import type { Dispatch } from "react";
+import { useState, type Dispatch } from "react";
+import { loadImage, type PlanImage } from "../import/client.ts";
 import type { Opening, Room, Space } from "../model/types.ts";
 import type { Units } from "../model/units.ts";
 import { LengthInput } from "./LengthInput.tsx";
@@ -44,8 +45,30 @@ export function RoomPanel({ space, room, units, dispatch }: Props) {
         </button>
       </div>
 
+      {space.sourceImage && <OriginalPlan imageKey={space.sourceImage} />}
       {room && <RoomEditor room={room} units={units} dispatch={dispatch} canDelete={space.rooms.length > 1} />}
     </div>
+  );
+}
+
+function OriginalPlan({ imageKey }: { imageKey: string }) {
+  const [image, setImage] = useState<PlanImage | null | "missing">(null);
+  if (image && image !== "missing") {
+    return (
+      <div className="original-plan">
+        <img src={image.dataUrl} alt="The original floor plan" />
+        <button className="link" onClick={() => setImage(null)}>
+          Hide the floor plan
+        </button>
+      </div>
+    );
+  }
+  return image === "missing" ? (
+    <p className="hint">The floor plan picture isn't saved on this device.</p>
+  ) : (
+    <button className="link" onClick={async () => setImage((await loadImage(imageKey)) ?? "missing")}>
+      Show the original floor plan
+    </button>
   );
 }
 
@@ -64,6 +87,13 @@ function RoomEditor({ room, units, dispatch, canDelete }: { room: Room; units: U
         <LengthInput label="Width (left to right)" value={size.width} units={units} bare="ft" min={24} onChange={(w) => update(resizeRoom(room, w, size.length))} />
         <LengthInput label="Length (top to bottom)" value={size.length} units={units} bare="ft" min={24} onChange={(l) => update(resizeRoom(room, size.width, l))} />
       </div>
+
+      {room.approximate && (
+        <p className="note">This room's size came from listing text, so its shape and doors are guesses. Add the doors you know about.</p>
+      )}
+      {room.wallSources.includes("inferred") && (
+        <p className="note">Some walls were measured from the drawing rather than read from a printed size. Answers that depend on them are marked approximate. Retype a size to confirm it.</p>
+      )}
 
       <h3>Doors and windows</h3>
       {room.openings.length === 0 && <p className="hint">Add the entry door so walkways can be checked.</p>}
@@ -96,7 +126,7 @@ function RoomEditor({ room, units, dispatch, canDelete }: { room: Room; units: U
   );
 }
 
-interface OpeningProps {
+export interface OpeningProps {
   index: number;
   room: Room;
   opening: Opening;
@@ -104,6 +134,8 @@ interface OpeningProps {
   onChange: (o: Opening) => void;
   onDelete: () => void;
   onMakeEntry: () => void;
+  /** Highlight for review (the floor plan reader wasn't sure). */
+  doubtful?: boolean;
 }
 
 /**
@@ -111,7 +143,7 @@ interface OpeningProps {
  * or top/bottom on the plan) and stored in model terms (offset from the wall's start
  * vertex; hinge as seen from inside the room).
  */
-function OpeningEditor({ room, opening: o, units, onChange, onDelete, onMakeEntry }: OpeningProps) {
+export function OpeningEditor({ room, opening: o, units, onChange, onDelete, onMakeEntry, doubtful }: OpeningProps) {
   const size = roomSize(room);
   const horizontal = o.wall % 2 === 0;
   const wallLen = horizontal ? size.width : size.length;
@@ -127,7 +159,7 @@ function OpeningEditor({ room, opening: o, units, onChange, onDelete, onMakeEntr
   const entryId = room.openings.find((x) => x.entry && (x.type === "door" || x.type === "passage"))?.id ?? room.openings.find((x) => x.type === "door" || x.type === "passage")?.id;
 
   return (
-    <fieldset className="opening">
+    <fieldset className={doubtful ? "opening doubtful" : "opening"}>
       <legend>
         <select value={o.type} aria-label="Type" onChange={(e) => onChange({ ...o, type: e.target.value as Opening["type"] })}>
           {TYPES.map((t) => (

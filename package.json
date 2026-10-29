@@ -10,7 +10,9 @@
     "p0:floorplan:extract": "tsx phase0/floorplan/extract.ts",
     "p0:floorplan:score": "tsx phase0/floorplan/score.ts",
     "p0:furniture": "tsx phase0/furniture/probe.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "server": "tsx server/index.ts",
+    "start": "npm run build && tsx server/index.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520" font-family="Arial, sans-serif">
+  <rect width="880" height="520" fill="#fff"/>
+  <g fill="none" stroke="#222" stroke-width="10">
+    <rect x="25" y="25" width="475" height="370"/>
+    <rect x="500" y="25" width="340" height="310"/>
+    <rect x="500" y="335" width="130" height="60"/>
+    <rect x="635" y="335" width="205" height="150"/>
+  </g>
+  <!-- door gaps -->
+  <g stroke="#fff" stroke-width="12">
+    <line x1="80" y1="390" x2="170" y2="390"/>
+    <line x1="500" y1="240" x2="500" y2="320"/>
+    <line x1="515" y1="335" x2="615" y2="335"/>
+    <line x1="650" y1="335" x2="725" y2="335"/>
+    <line x1="200" y1="25" x2="320" y2="25"/>
+  </g>
+  <g fill="none" stroke="#555" stroke-width="1.5">
+    <line x1="200" y1="21" x2="320" y2="21"/><line x1="200" y1="29" x2="320" y2="29"/>
+    <path d="M80 390 L80 300 A90 90 0 0 1 170 390"/>
+    <path d="M505 320 L585 320 A80 80 0 0 0 505 240"/>
+    <line x1="515" y1="332" x2="570" y2="332"/><line x1="560" y1="338" x2="615" y2="338"/>
+    <path d="M650 340 L650 415 A75 75 0 0 0 725 340"/>
+  </g>
+  <g font-size="16" fill="#222" text-anchor="middle">
+    <text x="262" y="200">LIVING ROOM</text><text x="262" y="222" font-size="14">15'6" x 12'0"</text>
+    <text x="670" y="170">BEDROOM</text><text x="670" y="192" font-size="14">11'0" x 10'0"</text>
+    <text x="565" y="370" font-size="12">CL</text>
+    <text x="737" y="410">BATH</text><text x="737" y="430" font-size="14">5'0" x 8'0"</text>
+  </g>
+</svg>

@@ -13,7 +13,9 @@ const PRICE_PER_MTOK: Record<string, { input: number; output: number }> = {
   "claude-haiku-5-5": { input: 0.1, output: 0.5 },
 };
 
-const client = new Anthropic();
+// Created on first use, so a server without an API key can still start and say so.
+let client: Anthropic | null = null;
+export const hasApiKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 
 export type ImageMediaType = "image/png" | "image/jpeg" | "image/gif" | "image/webp";
 
@@ -59,6 +61,7 @@ export async function extract<S extends z.ZodType>(
   content.push({ type: "text", text: instruction });
 
   const started = Date.now();
+  client ??= new Anthropic();
   const response = await client.beta.messages.parse({
     model: MODEL,
     max_tokens: 16000,

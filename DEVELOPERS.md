@@ -10,7 +10,7 @@ See SPEC.md for the product spec and phased plan.
 | --- | --- |
 | 0 · Proof tests | Harness built, not yet run (needs screenshots, retailer links and an API key). See [`phase0/README.md`](phase0/README.md). |
 | 1 · 2D planner and fit engine | Built. **Gate passed:** all 27 golden cases pass. |
-| 2 · Floor plan import | Not started. |
+| 2 · Floor plan import | Built. Gate ("a real listing screenshot becomes a confirmed layout") **not yet met**: verified end to end with a sample plan and a recorded reading, not with a real screenshot and live Claude call. |
 | 3 · Furniture import | Not started. |
 
 ## Run it
@@ -19,9 +19,19 @@ See SPEC.md for the product spec and phased plan.
 npm install
 ```
 
+The app in development (planner, listing text and typed sizes all work without a server):
+
 ```bash
 npm run dev
 ```
+
+The floor plan reader, in a second terminal. Vite proxies `/api` to it on port 8787:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run server
+```
+
+Tests, and a production build (typecheck plus the installable web app in `dist/`):
 
 ```bash
 npm test
@@ -31,7 +41,13 @@ npm test
 npm run build
 ```
 
-`npm run build` typechecks and builds the installable web app (PWA) into `dist/`.
+Production is one Node process that serves `dist/` and the API:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npm start
+```
+
+Without a key the server still starts; floor plan reading answers 503 with a plain message and the rest of the app works.
 
 ## What Phase 1 does
 
@@ -68,6 +84,23 @@ The spec left these open, so the engine makes a call on each. They're easy to ch
 - **Approximate** covers a piece within the walkway width (or its deepest use zone) of an inferred wall, or within door width plus walkway width of an unconfirmed opening.
 - Walkway widths are measured on a 0.5 in grid and are accurate to about ±0.5 in.
 
-### Not in Phase 1
+## Floor plan import (Phase 2)
 
-Share links, add-ons and overrides (data model only), floor plan and product-link import (Phases 2–3), round tables.
+```
+picture ──resize to ≤1568 px──▶ POST /api/floorplan ──Claude──▶ PlanReading ──draftFromReading──▶ confirm screen ──▶ Rooms
+listing text ──parseListingText──▶ draftFromText ───────────────────────────────────────────────▲
+```
+
+- `src/import/reading.ts`: what Claude is asked for (`PlanReading`, structured output). It copies dimension labels verbatim and gives positions in image pixels. **It does no arithmetic.** The same prompt and schema are used by the Phase 0 test, so Phase 0 measures what ships.
+- `src/import/labels.ts`: parses labels (`11'2" x 12'0"`, `12'10 x 10'`, `3.4 x 3.6 m`…) and listing text. Pure, tested.
+- `src/import/draft.ts`: scale = median px-per-inch over labeled rooms. A label's longer number goes to the longer drawn side. Unlabeled rooms are measured with the scale and tagged `inferred`. Labels more than 12% off the drawing's scale are flagged. Openings are converted from pixels to wall offsets, and all start unconfirmed.
+- `src/app/ConfirmPlan.tsx`: the reading drawn over the picture at the typed sizes, so a wrong number shows as an outline missing the walls. Every size is a typed field, with highlighted issues and doubtful openings. Per-wall source tags (`labeled` / `inferred` / `user-edited`) and "Looks right" turn an inferred size into `user-edited`. Confirming makes openings `confirmed`.
+- `server/`: `index.ts` (API plus static files), `claude.ts` (shared structured-output call with `fallbacks: "default"`; also used by Phase 0), `imageSize.ts`.
+- Pictures are kept in IndexedDB (`Space.sourceImage`), not localStorage.
+- Rooms from listing text set `Room.approximate`, which marks every verdict in them approximate.
+- Images are shrunk to 1568 px on the long side before sending, so the pixel positions Claude reports match the image the overlay draws on.
+- Not yet: PDF pages, non-rectangular rooms from images (the reading gives each room's bounding box), dragging doors on the overlay (positions are typed fields, as the spec asks).
+
+## Not built yet
+
+Share links, add-ons and overrides (data model only), product-link import (Phase 3), round tables.

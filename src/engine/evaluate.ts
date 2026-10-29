@@ -201,6 +201,7 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
     const result: Result = rs.some((r) => r.tier === 0) ? "doesnt-fit" : rs.length ? "tight" : "fits";
     const reach = Math.max(required, ...p.zones.map((z) => z.depth));
     const approximateReasons: string[] = [];
+    if (room.approximate) approximateReasons.push("the room's shape and doors are guesses (sizes came from listing text)");
     for (const w of ws) {
       if (room.wallSources[w.index] !== "inferred") continue;
       if (Math.min(...p.polys.map((poly) => distPolySegment(poly, w.a, w.b))) <= reach) {

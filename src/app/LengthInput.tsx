@@ -3,8 +3,8 @@ import { lengthFieldValue, parseLength, type Units } from "../model/units.ts";
 
 interface Props {
   label: string;
-  /** Inches. */
-  value: number;
+  /** Inches; null shows an empty field that must be filled in. */
+  value: number | null;
   units: Units;
   /** How a bare number is read: room sizes in feet, furniture in inches. */
   bare: "ft" | "in";
@@ -16,19 +16,20 @@ interface Props {
 export function LengthInput({ label, value, units, bare, onChange, min = 0 }: Props) {
   const id = useId();
   const bareUnit = units === "cm" ? "cm" : bare;
-  const shown = lengthFieldValue(value, units, bareUnit);
+  const shown = value === null ? "" : lengthFieldValue(value, units, bareUnit);
   const [draft, setDraft] = useState(shown);
   const [error, setError] = useState(false);
   useEffect(() => setDraft(shown), [shown]);
 
   const commit = () => {
+    if (value === null && !draft.trim()) return; // still blank: nothing to commit yet
     const v = parseLength(draft, bareUnit);
     if (v === null || v < min) {
       setError(true);
       return;
     }
     setError(false);
-    if (Math.abs(v - value) > 1e-9) onChange(v);
+    if (value === null || Math.abs(v - value) > 1e-9) onChange(v);
     else setDraft(shown);
   };
 
