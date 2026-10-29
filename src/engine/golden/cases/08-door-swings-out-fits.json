@@ -1,0 +1,4 @@
+{ "name": "Same box, but the door swings out of the room",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"out","hinge":"right"}] },
+  "items": [{ "id": "box", "kind": "generic", "width": 20, "depth": 20, "x": 10, "y": 90, "rotation": 0 }],
+  "expect": { "box": { "result": "fits", "codes": [] } } }

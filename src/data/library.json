@@ -1,0 +1,66 @@
+{
+  "_about": "Generic items with typical sizes in inches (width x depth x height), for users without a product link. Sizes are common norms, not any one product; beds include a typical frame.",
+  "groups": [
+    {
+      "label": "Bedroom",
+      "items": [
+        { "id": "bed-twin", "name": "Twin bed", "kind": "bed", "width": 41, "depth": 78, "height": 40 },
+        { "id": "bed-twin-xl", "name": "Twin XL bed", "kind": "bed", "width": 41, "depth": 83, "height": 40 },
+        { "id": "bed-full", "name": "Full bed", "kind": "bed", "width": 56, "depth": 78, "height": 40 },
+        { "id": "bed-queen", "name": "Queen bed", "kind": "bed", "width": 62, "depth": 83, "height": 42 },
+        { "id": "bed-king", "name": "King bed", "kind": "bed", "width": 78, "depth": 83, "height": 42 },
+        { "id": "bed-cal-king", "name": "California king bed", "kind": "bed", "width": 74, "depth": 87, "height": 42 },
+        { "id": "nightstand", "name": "Nightstand", "kind": "nightstand", "width": 20, "depth": 16, "height": 24 },
+        { "id": "dresser-wide", "name": "6-drawer dresser", "kind": "dresser", "width": 60, "depth": 18, "height": 32 },
+        { "id": "dresser-tall", "name": "Tall dresser", "kind": "dresser", "width": 34, "depth": 18, "height": 48 },
+        { "id": "wardrobe", "name": "Wardrobe", "kind": "wardrobe", "width": 40, "depth": 24, "height": 72 }
+      ]
+    },
+    {
+      "label": "Office",
+      "items": [
+        { "id": "desk-48", "name": "48 in desk", "kind": "desk", "width": 48, "depth": 24, "height": 30 },
+        { "id": "desk-60", "name": "60 in desk", "kind": "desk", "width": 60, "depth": 30, "height": 30 },
+        {
+          "id": "desk-corner",
+          "name": "L-shaped corner desk",
+          "kind": "desk",
+          "width": 60,
+          "depth": 24,
+          "height": 30,
+          "footprint": { "shape": "l", "side": "right", "returnWidth": 24, "returnDepth": 60 }
+        },
+        { "id": "office-chair", "name": "Office chair", "kind": "chair", "width": 26, "depth": 26, "height": 40 },
+        { "id": "bookshelf", "name": "Bookshelf", "kind": "bookshelf", "width": 32, "depth": 12, "height": 72 }
+      ]
+    },
+    {
+      "label": "Living",
+      "items": [
+        { "id": "sofa-3", "name": "3-seat sofa", "kind": "sofa", "width": 84, "depth": 36, "height": 34 },
+        { "id": "loveseat", "name": "Loveseat", "kind": "sofa", "width": 60, "depth": 36, "height": 34 },
+        {
+          "id": "sectional-l",
+          "name": "L-shaped sectional",
+          "kind": "sofa",
+          "width": 110,
+          "depth": 36,
+          "height": 34,
+          "footprint": { "shape": "l", "side": "left", "returnWidth": 36, "returnDepth": 66 }
+        },
+        { "id": "armchair", "name": "Armchair", "kind": "chair", "width": 32, "depth": 34, "height": 34 },
+        { "id": "coffee-table", "name": "Coffee table", "kind": "table", "width": 48, "depth": 24, "height": 18 },
+        { "id": "side-table", "name": "Side table", "kind": "table", "width": 20, "depth": 20, "height": 24 },
+        { "id": "tv-stand", "name": "TV stand", "kind": "tv_stand", "width": 60, "depth": 16, "height": 22 }
+      ]
+    },
+    {
+      "label": "Dining",
+      "items": [
+        { "id": "dining-4", "name": "Dining table (4 seats)", "kind": "dining_table", "width": 48, "depth": 30, "height": 30 },
+        { "id": "dining-6", "name": "Dining table (6 seats)", "kind": "dining_table", "width": 72, "depth": 36, "height": 30 },
+        { "id": "dining-chair", "name": "Dining chair", "kind": "chair", "width": 18, "depth": 20, "height": 36 }
+      ]
+    }
+  ]
+}

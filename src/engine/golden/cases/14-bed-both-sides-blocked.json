@@ -1,0 +1,8 @@
+{ "name": "Bed with 10 in to the wall on one side and a bookshelf in the 24 in access on the other",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [
+    { "id": "bed", "kind": "bed", "width": 60, "depth": 80, "x": 40, "y": 40, "rotation": 0 },
+    { "id": "shelf", "kind": "bookshelf", "width": 30, "depth": 18, "x": 95, "y": 9, "rotation": 0 }],
+  "expect": {
+    "bed": { "result": "tight", "codes": ["use-zone"] },
+    "shelf": { "result": "fits", "codes": [] } } }

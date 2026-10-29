@@ -1,0 +1,4 @@
+{ "name": "Item placed completely outside the room",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [{ "id": "box", "kind": "generic", "width": 20, "depth": 20, "x": 200, "y": 50, "rotation": 0 }],
+  "expect": { "box": { "result": "doesnt-fit", "codes": ["outside-room"] } } }

@@ -1,0 +1,8 @@
+{ "name": "Two desks overlapping by 4 in both don't fit",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [
+    { "id": "a", "kind": "desk", "width": 48, "depth": 24, "x": 40, "y": 12, "rotation": 0 },
+    { "id": "b", "kind": "desk", "width": 48, "depth": 24, "x": 84, "y": 12, "rotation": 0 }],
+  "expect": {
+    "a": { "result": "doesnt-fit", "codes": ["item-overlap"] },
+    "b": { "result": "doesnt-fit", "codes": ["item-overlap"] } } }

@@ -1,0 +1,6 @@
+{ "name": "L-shaped sectional (chaise on the left) tucked into the top-left corner",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [{ "id": "sofa", "kind": "sofa", "width": 100, "depth": 36,
+    "footprint": { "shape": "l", "side": "left", "returnWidth": 36, "returnDepth": 66 },
+    "x": 50, "y": 33, "rotation": 0 }],
+  "expect": { "sofa": { "result": "fits", "codes": [] } } }

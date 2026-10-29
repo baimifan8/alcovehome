@@ -1,0 +1,8 @@
+{ "name": "Box 30 in in front of a desk: chair pull-out needs 36 in, so the desk is tight (not doesn't fit)",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [
+    { "id": "desk", "kind": "desk", "width": 48, "depth": 24, "x": 72, "y": 12, "rotation": 0 },
+    { "id": "box", "kind": "generic", "width": 48, "depth": 20, "x": 72, "y": 64, "rotation": 0 }],
+  "expect": {
+    "desk": { "result": "tight", "codes": ["use-zone"] },
+    "box": { "result": "fits", "codes": [] } } }

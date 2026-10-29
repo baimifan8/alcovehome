@@ -1,0 +1,8 @@
+{ "name": "Verdicts that depend on an inferred wall are approximate; ones far from it are not",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}], "wallSources": { "right": "inferred" } },
+  "items": [
+    { "id": "near", "kind": "desk", "width": 48, "depth": 24, "x": 132, "y": 60, "rotation": 90 },
+    { "id": "far", "kind": "desk", "width": 48, "depth": 24, "x": 12, "y": 60, "rotation": 270 }],
+  "expect": {
+    "near": { "result": "fits", "codes": [], "approximate": true },
+    "far": { "result": "fits", "codes": [], "approximate": false } } }

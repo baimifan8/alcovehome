@@ -1,0 +1,49 @@
+{
+  "_about": "Fit engine rules (SPEC.md, 'Fit engine rules'). All lengths in inches. Clearances are approximate norms and user-editable; the engine reads them from here, never from code.",
+  "clearances": {
+    "mainWalkway": { "label": "Main walkway", "inches": 30 },
+    "deskChairPullOut": { "label": "Desk chair pull-out", "inches": 36 },
+    "bedSideAccess": { "label": "Bed side access", "inches": 24 },
+    "dresserDrawers": { "label": "Dresser drawers", "inches": 36 },
+    "sofaFront": { "label": "Sofa legroom", "inches": 14 },
+    "diningChairPullOut": { "label": "Dining chair pull-out", "inches": 36 },
+    "wardrobeDoors": { "label": "Wardrobe doors", "inches": 30 },
+    "doorwayFront": { "label": "Keep clear in front of doorways", "inches": 12 }
+  },
+  "doors": {
+    "_about": "Swing doors block the full arc of their width. Sliding and bifold doors block a strip in front of the opening: doorwayFront deep, or width x bifoldProjection for bifolds if larger.",
+    "bifoldProjection": 0.25
+  },
+  "itemKinds": {
+    "bed": {
+      "label": "Bed",
+      "zones": [{ "label": "side access", "sides": ["left", "right"], "mode": "any", "clearance": "bedSideAccess" }]
+    },
+    "desk": {
+      "label": "Desk",
+      "zones": [{ "label": "chair pull-out", "sides": ["front"], "mode": "all", "clearance": "deskChairPullOut" }]
+    },
+    "dresser": {
+      "label": "Dresser",
+      "zones": [{ "label": "drawer opening", "sides": ["front"], "mode": "all", "clearance": "dresserDrawers" }]
+    },
+    "sofa": {
+      "label": "Sofa",
+      "zones": [{ "label": "legroom", "sides": ["front"], "mode": "all", "clearance": "sofaFront" }]
+    },
+    "dining_table": {
+      "label": "Dining table",
+      "zones": [{ "label": "chair pull-out", "sides": ["front", "back"], "mode": "all", "clearance": "diningChairPullOut" }]
+    },
+    "wardrobe": {
+      "label": "Wardrobe",
+      "zones": [{ "label": "door swing", "sides": ["front"], "mode": "all", "clearance": "wardrobeDoors" }]
+    },
+    "nightstand": { "label": "Nightstand", "zones": [] },
+    "bookshelf": { "label": "Bookshelf", "zones": [] },
+    "table": { "label": "Table", "zones": [] },
+    "chair": { "label": "Chair", "zones": [] },
+    "tv_stand": { "label": "TV stand", "zones": [] },
+    "generic": { "label": "Other", "zones": [] }
+  }
+}

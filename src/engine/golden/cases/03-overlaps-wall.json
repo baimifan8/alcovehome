@@ -1,0 +1,4 @@
+{ "name": "Desk 4 in into the left wall doesn't fit; its chair zone is also cut by the wall",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [{ "id": "desk", "kind": "desk", "width": 48, "depth": 24, "x": 20, "y": 12, "rotation": 0 }],
+  "expect": { "desk": { "result": "doesnt-fit", "codes": ["wall", "use-zone"] } } }

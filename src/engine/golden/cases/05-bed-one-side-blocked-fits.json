@@ -1,0 +1,8 @@
+{ "name": "Bed needs side access on at least one side: left side blocked by wall and nightstand, right side clear",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}] },
+  "items": [
+    { "id": "bed", "kind": "bed", "width": 60, "depth": 80, "x": 50, "y": 40, "rotation": 0 },
+    { "id": "nightstand", "kind": "nightstand", "width": 20, "depth": 16, "x": 10, "y": 8, "rotation": 0 }],
+  "expect": {
+    "bed": { "result": "fits", "codes": [] },
+    "nightstand": { "result": "fits", "codes": [] } } }
