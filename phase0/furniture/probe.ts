@@ -12,7 +12,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { extract, mediaTypeFor, type ExtractionRun } from "../shared/claude.ts";
+import { extract, mediaTypeFor, type ExtractionRun } from "../../server/claude.ts";
 import { Product } from "./schema.ts";
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);

@@ -78,13 +78,22 @@ export function roomSize(room: Room) {
   return { width: Math.max(...xs) - Math.min(...xs), length: Math.max(...ys) - Math.min(...ys) };
 }
 
-/** Resize a rectangular room, keeping openings on their walls. */
+/**
+ * Resize a rectangular room, keeping openings on their walls. A changed width marks
+ * the top and bottom walls as user-edited; a changed length, the left and right.
+ */
 export function resizeRoom(room: Room, width: number, length: number): Room {
-  const next = rectRoom(room.name, width, length, room.id);
   const old = roomSize(room);
+  const widthChanged = Math.abs(width - old.width) > 1e-9;
+  const lengthChanged = Math.abs(length - old.length) > 1e-9;
+  const src = room.wallSources;
+  const wallSources = [0, 1, 2, 3].map((i) =>
+    (i % 2 === 0 ? widthChanged : lengthChanged) ? "user-edited" : (src[i] ?? "user-edited"),
+  ) as Room["wallSources"];
+  const next = { ...rectRoom(room.name, width, length, room.id), wallSources, ...(room.approximate ? { approximate: true } : {}) };
   const wallLen = (w: number, s: { width: number; length: number }) => (w % 2 === 0 ? s.width : s.length);
   const openings = room.openings.map((o) => {
-    // Keep the distance from the plan's left/top corner (see openingCorner) the same.
+    // Keep the distance from the plan's left/top corner the same.
     const fromCorner = o.wall === 0 || o.wall === 1 ? o.offset : wallLen(o.wall, old) - o.offset - o.width;
     const len = wallLen(o.wall, { width, length });
     const width_ = Math.min(o.width, len);
@@ -145,7 +154,7 @@ export function findSpot(state: AppState, room: Room, item: InventoryItem): Plac
 }
 
 export type Action =
-  | { type: "createSpace"; name: string; room: Room }
+  | { type: "createSpace"; name: string; rooms: Room[]; sourceImage?: string; id?: string }
   | { type: "updateSpace"; space: Space }
   | { type: "deleteSpace"; id: string }
   | { type: "select"; spaceId: string | null; roomId?: string | null }
@@ -167,8 +176,15 @@ function updateCurrentSpace(state: AppState, fn: (s: Space) => Space): AppState 
 export function reducer(state: AppState, a: Action): AppState {
   switch (a.type) {
     case "createSpace": {
-      const space: Space = { id: newId(), name: a.name, createdAt: new Date().toISOString(), rooms: [a.room], placements: [] };
-      return { ...state, spaces: [...state.spaces, space], current: { spaceId: space.id, roomId: a.room.id } };
+      const space: Space = {
+        id: a.id ?? newId(),
+        name: a.name,
+        createdAt: new Date().toISOString(),
+        rooms: a.rooms,
+        placements: [],
+        ...(a.sourceImage ? { sourceImage: a.sourceImage } : {}),
+      };
+      return { ...state, spaces: [...state.spaces, space], current: { spaceId: space.id, roomId: a.rooms[0]?.id ?? null } };
     }
     case "updateSpace":
       return { ...state, spaces: state.spaces.map((s) => (s.id === a.space.id ? a.space : s)) };

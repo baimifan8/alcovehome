@@ -1,5 +1,6 @@
 // Phase 0 · floor plan extraction.
-// Reads every image in phase0/floorplan/images/ and writes one JSON per image to
+// Reads every image in phase0/floorplan/images/ with exactly the prompt and format
+// the app uses (src/import/reading.ts) and writes one JSON per image to
 // phase0/floorplan/out/, including token usage, cost and latency.
 //
 //   npm run p0:floorplan:extract            # all images
@@ -7,24 +8,13 @@
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { extract, mediaTypeFor } from "../shared/claude.ts";
-import { Layout } from "./schema.ts";
+import { extract, mediaTypeFor } from "../../server/claude.ts";
+import { imageSize } from "../../server/imageSize.ts";
+import { PlanReading, READING_SYSTEM, readingInstruction } from "../../src/import/reading.ts";
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const IMAGES = path.join(DIR, "images");
 const OUT = path.join(DIR, "out");
-
-const SYSTEM = `You read real-estate floor plan images and return the layout as structured data.
-
-Rules:
-- Report every room you can see, with its printed dimension label copied verbatim.
-- Convert dimensions to inches (11'2" = 134). Metric labels: 1 m = 39.37 in.
-- If a room has no printed dimensions, estimate them from the plan's scale only when at least one labeled wall makes the scale clear; mark those dims_source "inferred_from_scale". Otherwise leave them null.
-- Doors: report swing direction from the drawn arc. Closet doors are type closet_door. Bifold/sliding closet doors are closet_door with swing "sliding".
-- Never invent a number. If a label is unreadable, say so in warnings and lower confidence.
-- Use confidence "low" for anything a person should double-check.`;
-
-const INSTRUCTION = "Extract the floor plan in this image.";
 
 async function main() {
   const requested = process.argv.slice(2);
@@ -42,10 +32,20 @@ async function main() {
       console.warn(`skip ${file}: unsupported image type`);
       continue;
     }
-    const base64 = (await readFile(path.join(IMAGES, file))).toString("base64");
+    const bytes = await readFile(path.join(IMAGES, file));
+    const size = imageSize(bytes);
+    if (!size) {
+      console.warn(`skip ${file}: can't read image size`);
+      continue;
+    }
     process.stdout.write(`${file} ... `);
     try {
-      const run = await extract(Layout, SYSTEM, [{ kind: "image", mediaType, base64 }], INSTRUCTION);
+      const run = await extract(
+        PlanReading,
+        READING_SYSTEM,
+        [{ kind: "image", mediaType, base64: bytes.toString("base64") }],
+        readingInstruction(size.width, size.height),
+      );
       await writeFile(path.join(OUT, `${path.parse(file).name}.json`), JSON.stringify({ image: file, ...run }, null, 2));
       console.log(
         run.output

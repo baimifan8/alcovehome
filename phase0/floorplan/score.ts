@@ -4,11 +4,14 @@
 //
 // The gate question is "is extraction good enough to fix in a confirm screen?",
 // so the headline number is "fixes": how many edits a user would make to get
-// from the extraction to the truth.
+// from the extraction to the truth. Scoring runs on the same draft rooms the app's
+// confirm screen shows (src/import/draft.ts), not on raw model output.
 
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { Layout, Truth } from "./schema.ts";
+import { draftFromReading, type DraftPlan } from "../../src/import/draft.ts";
+import { PlanReading } from "../../src/import/reading.ts";
+import { Truth } from "./schema.ts";
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 
@@ -47,8 +50,8 @@ function dimsMatch(truth: [number, number], got: [number, number]) {
   return Math.abs(t[0] - g[0]) <= tolerance(t[0]) && Math.abs(t[1] - g[1]) <= tolerance(t[1]);
 }
 
-function scorePlan(truth: Truth, layout: Layout, run: { costUsd: number | null; latencyMs: number }): PlanScore {
-  const unused = new Set(layout.rooms.map((_, i) => i));
+function scorePlan(truth: Truth, plan: DraftPlan, run: { costUsd: number | null; latencyMs: number }): PlanScore {
+  const unused = new Set(plan.rooms.map((_, i) => i));
   const s: PlanScore = {
     image: truth.image,
     truthRooms: truth.rooms.length,
@@ -68,7 +71,7 @@ function scorePlan(truth: Truth, layout: Layout, run: { costUsd: number | null; 
 
   for (const tr of truth.rooms) {
     const names = [tr.name, ...(tr.aliases ?? [])].map(norm);
-    const idx = [...unused].find((i) => names.includes(norm(layout.rooms[i].name)));
+    const idx = [...unused].find((i) => names.includes(norm(plan.rooms[i].name)));
     if (idx === undefined) {
       s.notes.push(`missed room "${tr.name}"`);
       if (tr.width_in !== null && tr.length_in !== null) {
@@ -80,26 +83,27 @@ function scorePlan(truth: Truth, layout: Layout, run: { costUsd: number | null; 
     }
     unused.delete(idx);
     s.foundRooms++;
-    const got = layout.rooms[idx];
+    const got = plan.rooms[idx];
 
     if (tr.width_in !== null && tr.length_in !== null) {
       s.dimsTotal++;
-      if (got.width_in === null || got.length_in === null) {
+      if (got.width === null || got.length === null) {
         s.dimsMissing++;
         s.notes.push(`"${tr.name}": no dimensions`);
-      } else if (dimsMatch([tr.width_in, tr.length_in], [got.width_in, got.length_in])) {
+      } else if (dimsMatch([tr.width_in, tr.length_in], [got.width, got.length])) {
         s.dimsCorrect++;
       } else {
         s.dimsWrong++;
-        if (got.confidence !== "high") s.dimsWrongButFlagged++;
+        // Flagged = highlighted on the confirm screen.
+        if (got.issues.length) s.dimsWrongButFlagged++;
         s.notes.push(
-          `"${tr.name}": got ${got.width_in}x${got.length_in}, want ${tr.width_in}x${tr.length_in} (${got.confidence}, ${got.dims_source})`,
+          `"${tr.name}": got ${got.width}x${got.length}, want ${tr.width_in}x${tr.length_in} (${got.widthSource}${got.issues.length ? ", flagged" : ""})`,
         );
       }
     }
 
-    const openings = layout.openings.filter((o) => norm(o.room) === norm(got.name));
-    const doors = openings.filter((o) => o.type === "door" || o.type === "sliding_door").length;
+    const openings = got.openings;
+    const doors = openings.filter((o) => o.type === "door").length;
     const windows = openings.filter((o) => o.type === "window").length;
     const closets = openings.filter((o) => o.type === "closet_door").length;
     const err =
@@ -111,7 +115,7 @@ function scorePlan(truth: Truth, layout: Layout, run: { costUsd: number | null; 
   }
 
   s.extraRooms = unused.size;
-  for (const i of unused) s.notes.push(`extra room "${layout.rooms[i].name}"`);
+  for (const i of unused) s.notes.push(`extra room "${plan.rooms[i].name}"`);
   s.fixes = s.truthRooms - s.foundRooms + s.extraRooms + s.dimsWrong + s.dimsMissing + s.openingCountError;
   return s;
 }
@@ -137,12 +141,12 @@ async function main() {
       failures.push(`${f}: no extraction output (run extract first)`);
       continue;
     }
-    const layout = Layout.safeParse(raw.output);
-    if (!layout.success) {
+    const reading = PlanReading.safeParse(raw.output);
+    if (!reading.success) {
       failures.push(`${f}: extraction failed (stop_reason=${raw.stopReason})`);
       continue;
     }
-    scores.push(scorePlan(truth, layout.data, raw));
+    scores.push(scorePlan(truth, draftFromReading(reading.data), raw));
   }
 
   if (!scores.length) {
@@ -181,7 +185,7 @@ async function main() {
     "",
     "## Supporting numbers",
     "",
-    `- Wrong dimensions flagged medium/low confidence: ${wrongDims ? pct(sum("dimsWrongButFlagged") / wrongDims) : "n/a"} (${sum("dimsWrongButFlagged")}/${wrongDims}). Higher is better: the confirm screen can highlight them.`,
+    `- Wrong dimensions highlighted on the confirm screen: ${wrongDims ? pct(sum("dimsWrongButFlagged") / wrongDims) : "n/a"} (${sum("dimsWrongButFlagged")}/${wrongDims}). Higher is better: the confirm screen can highlight them.`,
     `- Missing dimensions: ${sum("dimsMissing")}/${sum("dimsTotal")}`,
     `- Extra (hallucinated or split) rooms: ${sum("extraRooms")}`,
     `- Door/window/closet count errors: ${sum("openingCountError")}`,
