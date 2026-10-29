@@ -18,7 +18,7 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 - **Or just type the room sizes**, in feet and inches or in centimeters.
 - **Add furniture from a store link.** Paste the link to the product page and the app finds its assembled size (not the box size), including whether it's a corner sofa or an L-shaped desk. You check what it found, with a link back to the store page.
 - **If a store won't let the app read its page**, take a screenshot of the product's size details and paste that instead.
-- **Get instant sizes for popular pieces.** Once anyone has checked a product's size, the next person who pastes the same link gets it right away (and still gets to check it).
+- **Get instant sizes for popular pieces.** Once a product's size has been checked, the next person who pastes the same link gets it right away (and still gets to check it). To keep these shared sizes honest, a size is only shared once it matches the store's own page or at least two different people agree on it, so one person can't put in a wrong size.
 - **Or add furniture without a link**, from a list of common pieces (beds, desks, sofas, dressers…) or by typing your own sizes.
 - **Add extras that change the size**, like a monitor arm, a hutch or a table leaf, and switch them on or off. The store's size stays as it is unless you choose to use your own measurement, and the app labels which one it's using.
 - **Move things around** by dragging them on the floor plan and turning them. Pieces line up neatly against walls and each other.

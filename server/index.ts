@@ -2,21 +2,24 @@
 //   POST /api/floorplan           read a floor plan image with Claude (the API key stays here)
 //   POST /api/product             read a store link: saved product, else the page with Claude
 //   POST /api/product/screenshot  read a screenshot of a product's size details
-//   POST /api/product/confirm     save a confirmed product for everyone (the shared cache)
+//   POST /api/product/confirm     one person's confirmation of a product size (the shared cache)
+//   DELETE /api/product?url=…     admin: forget a product (needs ALCOVE_ADMIN_TOKEN)
 //   everything else               serve the built app from dist/ (production only)
 //
 //   npm run server        # needs ANTHROPIC_API_KEY to read plans and products
 
+import { timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-import { normalizeProductUrl, PRODUCT_SYSTEM, ProductReading, SavedProduct } from "../src/import/product.ts";
+import { draftFromProduct, normalizeProductUrl, PRODUCT_SYSTEM, ProductReading, SavedProduct } from "../src/import/product.ts";
 import { PlanReading, READING_SYSTEM, readingInstruction } from "../src/import/reading.ts";
 import { extract, hasApiKey, type ImageMediaType } from "./claude.ts";
 import { imageSize } from "./imageSize.ts";
 import { detectBlock, pageText } from "./pageText.ts";
+import { clientAddress, limits, loadSalt, personKey, type RateLimit } from "./limits.ts";
 import { ProductCache } from "./productCache.ts";
 import { safeFetch } from "./safeFetch.ts";
 
@@ -27,6 +30,23 @@ const MEDIA: ImageMediaType[] = ["image/png", "image/jpeg", "image/gif", "image/
 const DATA = process.env.ALCOVE_DATA_DIR ?? path.resolve(path.dirname(new URL(import.meta.url).pathname), "data");
 const cache = new ProductCache(path.join(DATA, "products.json"));
 const NOT_SET_UP = "Reading isn't set up on this server yet. You can still type the sizes.";
+const SALT = await loadSalt(DATA);
+const person = (req: IncomingMessage) => personKey(clientAddress(req), SALT);
+
+/** Count one use against a limit; on refusal, answer 429 and return false. */
+function allow(res: ServerResponse, limit: RateLimit, key: string, message: string): boolean {
+  if (limit.take(key)) return true;
+  send(res, 429, { error: message });
+  return false;
+}
+
+/** Readings cost money: a per-person limit, then a ceiling for the whole server. */
+function allowReading(req: IncomingMessage, res: ServerResponse): boolean {
+  return (
+    allow(res, limits.readsPerPerson, person(req), "You've read a lot of plans and products this hour. Try again later, or type the sizes.") &&
+    allow(res, limits.readsTotal, "all", "Reading is paused for today. You can still type the sizes.")
+  );
+}
 
 function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { "content-type": "application/json" });
@@ -62,6 +82,7 @@ async function floorplan(req: IncomingMessage, res: ServerResponse) {
   const size = imageSize(bytes);
   if (!size) return send(res, 400, { error: "That file doesn't look like an image." });
 
+  if (!allowReading(req, res)) return;
   try {
     const run = await extract(
       PlanReading,
@@ -106,10 +127,12 @@ async function product(req: IncomingMessage, res: ServerResponse) {
   }
   const url = body.url ? normalizeProductUrl(body.url) : null;
   if (!url) return send(res, 400, { error: "That doesn't look like a link to a product page." });
+  if (!allow(res, limits.lookupsPerPerson, person(req), "Too many links this hour. Try again later.")) return;
 
   const saved = await cache.get(url);
-  if (saved) return send(res, 200, { saved: saved.product, confirmations: saved.confirmations, url });
+  if (saved) return send(res, 200, { saved: saved.product, confirmations: saved.confirmations, pageVerified: saved.pageVerified, url });
   if (!hasApiKey()) return send(res, 503, { error: NOT_SET_UP });
+  if (!allowReading(req, res)) return;
 
   let html: string;
   try {
@@ -130,6 +153,11 @@ async function product(req: IncomingMessage, res: ServerResponse) {
       return send(res, 422, { error: `Couldn't find the size on that page. ${SCREENSHOT_HINT}`, needScreenshot: true, url });
     }
     console.log(`product ${url}: $${run.costUsd?.toFixed(4)}, ${run.latencyMs} ms`);
+    // Remember what the page itself says, so confirmations that match it can be trusted.
+    const d = draftFromProduct(run.output, url, "page");
+    if (d.width !== null && d.depth !== null && d.height !== null) {
+      await cache.recordPageReading(url, { width: d.width, depth: d.depth, height: d.height, shape: d.footprint.shape });
+    }
     send(res, 200, { reading: run.output, url });
   } catch (err) {
     apiError(res, err, "product");
@@ -148,6 +176,7 @@ async function productScreenshot(req: IncomingMessage, res: ServerResponse) {
   if (!body.imageBase64 || !MEDIA.includes(mediaType) || !imageSize(Buffer.from(body.imageBase64, "base64"))) {
     return send(res, 400, { error: "Send a PNG, JPEG, GIF or WebP image." });
   }
+  if (!allowReading(req, res)) return;
   try {
     const run = await extract(
       ProductReading,
@@ -172,8 +201,29 @@ async function productConfirm(req: IncomingMessage, res: ServerResponse) {
   const parsed = SavedProduct.safeParse(body);
   const url = parsed.success ? normalizeProductUrl(parsed.data.url) : null;
   if (!parsed.success || !url) return send(res, 400, { error: "That product can't be saved." });
-  const entry = await cache.confirm({ ...parsed.data, url });
-  send(res, 200, { confirmations: entry.confirmations });
+  const fp = parsed.data.footprint;
+  if (fp.shape === "l" && (fp.returnDepth <= parsed.data.depth || fp.returnWidth > parsed.data.width)) {
+    return send(res, 400, { error: "That product can't be saved." });
+  }
+  if (!allow(res, limits.confirmsPerPerson, person(req), "Too many confirmations today.")) return;
+  const { counted, served } = await cache.confirm({ ...parsed.data, url }, person(req));
+  // Tell the client whether its size is the one now shared; never who else voted.
+  const shared = !!served && served.product.width === parsed.data.width && served.product.depth === parsed.data.depth && served.product.height === parsed.data.height;
+  send(res, 200, { counted, shared });
+}
+
+/** Admin: DELETE /api/product?url=… with "Authorization: Bearer $ALCOVE_ADMIN_TOKEN". */
+async function productDelete(req: IncomingMessage, res: ServerResponse) {
+  const token = process.env.ALCOVE_ADMIN_TOKEN;
+  const given = String(req.headers.authorization ?? "").replace(/^Bearer /, "");
+  if (!token || token.length < 16) return send(res, 404, { error: "Not found" });
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return send(res, 401, { error: "Not allowed" });
+  const raw = new URL(req.url ?? "/", "http://x").searchParams.get("url");
+  const url = raw ? normalizeProductUrl(raw) : null;
+  if (!url) return send(res, 400, { error: "Give the product link as ?url=" });
+  send(res, 200, { removed: await cache.remove(url), url });
 }
 
 const TYPES: Record<string, string> = {
@@ -209,6 +259,7 @@ createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/product") return void product(req, res);
   if (req.method === "POST" && req.url === "/api/product/screenshot") return void productScreenshot(req, res);
   if (req.method === "POST" && req.url === "/api/product/confirm") return void productConfirm(req, res);
+  if (req.method === "DELETE" && req.url?.startsWith("/api/product?")) return void productDelete(req, res);
   if (req.method === "GET") return void serveStatic(req, res);
   send(res, 405, { error: "Method not allowed" });
 }).listen(PORT, () => {

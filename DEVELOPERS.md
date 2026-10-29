@@ -13,6 +13,10 @@ See SPEC.md for the product spec and phased plan.
 | 2 · Floor plan import | Built. Gate ("a real listing screenshot becomes a confirmed layout") **not yet met**: verified end to end with a sample plan and a recorded reading, not with a real screenshot and live Claude call. |
 | 3 · Furniture import | Built. Gate ("a new user goes from screenshot to verdict in under 5 minutes") **not yet met**: the full path runs end to end in a browser with recorded readings (about 1 s of app time and 8 actions), but hasn't been timed with real people or live reading. |
 
+## API key
+
+The server needs an **Anthropic API key**. Create one in the Claude Console (platform.claude.com) under API keys, add credits under Billing, and consider a monthly spend limit there too. Put the key in the server's environment as `ANTHROPIC_API_KEY`, never in the app or the repository. The default model is `claude-opus-5-5` (`ALCOVE_MODEL` changes it). Expect roughly $0.05–0.20 per floor plan and $0.10–0.40 per store page; the server logs the actual cost of each reading.
+
 ## Run it
 
 ```bash
@@ -115,11 +119,28 @@ link ──normalize──▶ shared cache hit? ──yes──▶ confirm (save
 - `src/import/product.ts`: `ProductReading` (Claude copies numbers **with their units**; code converts), `PRODUCT_SYSTEM`, `draftFromProduct` (issues: box sizes, missing numbers, an L with no return size, round/other shapes planned as their rectangle), `SavedProduct` (cache schema, validated on write), `normalizeProductUrl` (lowercase host, no `www`/fragment/tracking params, sorted query, Amazon → `/dp/ASIN`).
 - `server/safeFetch.ts`: the only way the server fetches user-supplied links. http(s) only, ports 80/443, no credentials in links, at most 5 redirects, 5 MB and 20 s limits, and a **connect-time DNS check that refuses private, loopback, link-local and reserved addresses** on every hop (no DNS-rebinding gap).
 - `server/pageText.ts`: bot-wall detection and page text (JSON-LD plus visible text). Pages over 150k characters keep JSON-LD whole and only the passages around size words; the server logs when that happens.
-- `server/productCache.ts`: a JSON file (`server/data/products.json`, or `$ALCOVE_DATA_DIR`). Confirming the same size again increments `confirmations`; a different size replaces the entry and resets the count. Cached results still go through the confirm step. There's no auth or rate limit yet, so anyone can overwrite an entry. Move it to a database with per-user limits before a public launch.
+- `server/productCache.ts`: the shared cache, a JSON file (`server/data/products.json`, or `$ALCOVE_DATA_DIR`). With no accounts, trust comes from evidence:
+  - Each link keeps candidate sizes, each with the set of people who confirmed it. A person is a salted hash of their address (see `limits.ts`) and has one vote per link; confirming a different size moves the vote.
+  - A size is served only when it's **page-verified** (it matches what the server itself read from the store page, via `recordPageReading`, and has at least one confirmation) or **at least 2 different people** confirmed it. Among trusted candidates, the most-backed wins.
+  - So one person can't replace a good entry, or create one from a doctored screenshot.
+  - Entries from before voting are loaded as untrusted.
+  - Cached results still go through the confirm step.
+- `server/limits.ts`: per-person and server-wide limits. These are in memory, so they reset on restart and aren't shared between servers.
+
+  | Env var | Default | Limits |
+  | --- | --- | --- |
+  | `ALCOVE_READS_PER_HOUR` | 30 | Paid readings (plans, pages, screenshots) per person |
+  | `ALCOVE_READS_PER_DAY` | 1000 | Paid readings for the whole server: caps the daily API bill |
+  | `ALCOVE_CONFIRMS_PER_DAY` | 100 | Cache confirmations per person |
+  | `ALCOVE_LOOKUPS_PER_HOUR` | 300 | Link lookups per person |
+
+  Behind a proxy or load balancer, set `ALCOVE_TRUST_PROXY=1` so `X-Forwarded-For` is used. Never set it when clients connect directly. The hashing salt is generated into `$ALCOVE_DATA_DIR/salt` (mode 600), or set `ALCOVE_SALT`.
+- Admin: remove a bad product with `curl -X DELETE -H "Authorization: Bearer $ALCOVE_ADMIN_TOKEN" "https://<host>/api/product?url=<link>"`. The endpoint is off unless `ALCOVE_ADMIN_TOKEN` is set (16+ characters).
+- Remaining risk: someone with two network addresses (say, home and phone) can make two votes, so they can still get a size shared for a link nobody else has confirmed, but not override a better-backed or page-verified size. Accounts or per-device attestation would close that; both are out of scope for v1.
 - `src/model/size.ts`: `effectiveSize` / `effectiveItem` = override ?? base, plus add-ons that are on. Extra depth also deepens an L's return. The engine, snapping and placement all use the effective item (`placeItem`, `localRects`, `bboxSize`).
 - Store sizes are locked in the item editor. "Use my own size" sets `InventoryItem.overrides`, which is shown as "your size".
 - The Phase 0 store test now uses the same fetcher, page cleanup, prompt and conversion.
 
 ## Not built yet
 
-Share links, the browser extension, round tables (planned as their bounding rectangle), auth and rate limits for the shared product cache.
+Share links, the browser extension, round tables (planned as their bounding rectangle), accounts, and limits shared across several servers.
