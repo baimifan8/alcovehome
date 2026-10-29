@@ -71,6 +71,8 @@ export interface ProductDraft {
   source: "page" | "screenshot" | "saved";
   /** For saved products: how many people confirmed this size. */
   confirmations?: number;
+  /** For saved products: the size matches what the store's own page says. */
+  pageVerified?: boolean;
 }
 
 export function draftFromProduct(r: ProductReading, url: string | null, source: "page" | "screenshot"): ProductDraft {
@@ -140,8 +142,8 @@ export const SavedProduct = z.object({
 
 export type SavedProduct = z.infer<typeof SavedProduct>;
 
-export function draftFromSaved(p: SavedProduct, confirmations: number): ProductDraft {
-  return { ...p, variantNote: null, evidence: null, issues: [], source: "saved", confirmations };
+export function draftFromSaved(p: SavedProduct, confirmations: number, pageVerified = false): ProductDraft {
+  return { ...p, variantNote: null, evidence: null, issues: [], source: "saved", confirmations, pageVerified };
 }
 
 /** Query parameters that track visits rather than pick a product or variant. */

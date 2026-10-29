@@ -24,7 +24,7 @@ export async function readProductLink(url: string, signal?: AbortSignal): Promis
   }
   if (r.body.saved) {
     const saved = SavedProduct.safeParse(r.body.saved);
-    if (saved.success) return { ok: true, draft: draftFromSaved(saved.data, r.body.confirmations ?? 1) };
+    if (saved.success) return { ok: true, draft: draftFromSaved(saved.data, r.body.confirmations ?? 1, Boolean(r.body.pageVerified)) };
   }
   const reading = ProductReading.safeParse(r.body.reading);
   if (!reading.success) return { ok: false, error: "The reader sent back something unexpected. Try again.", needScreenshot: true, url: r.body.url ?? null };

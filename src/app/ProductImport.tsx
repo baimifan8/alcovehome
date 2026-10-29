@@ -191,7 +191,7 @@ function ConfirmProduct({
 
   const from =
     d.source === "saved"
-      ? `Saved from a previous check${d.confirmations && d.confirmations > 1 ? ` (${d.confirmations} people agree)` : ""}. Check it still matches the page.`
+      ? `${d.pageVerified ? "Matches the store's page" : "Agreed by other people"}${d.confirmations ? ` · checked by ${d.confirmations} ${d.confirmations === 1 ? "person" : "people"}` : ""}. Check it still matches the page.`
       : d.source === "screenshot"
         ? "Read from your screenshot."
         : `Read from the ${d.retailer ?? "store"} page.`;
