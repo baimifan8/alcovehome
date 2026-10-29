@@ -1,6 +1,7 @@
 // Phase 0 · product-link reading on the top retailers.
-// For every URL in retailers.json:
-//   1. fetch the page the way a plain server would and note whether it is blocked;
+// Uses the app server's own fetcher, page cleanup, prompt and conversion, so the
+// results describe what ships. For every URL in retailers.json:
+//   1. fetch the page the way the server does and note whether it is blocked;
 //   2. (with --browser) load it again in headless Chromium, like a heavier server would;
 //   3. have Claude extract assembled dimensions from whatever text came back;
 //   4. if a specs screenshot is listed, extract from that too (the fallback path);
@@ -13,39 +14,17 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { extract, mediaTypeFor, type ExtractionRun } from "../../server/claude.ts";
-import { Product } from "./schema.ts";
+import { detectBlock, pageText } from "../../server/pageText.ts";
+import { safeFetch } from "../../server/safeFetch.ts";
+import { draftFromProduct, PRODUCT_SYSTEM, ProductReading } from "../../src/import/product.ts";
+
+type Product = ProductReading;
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const USE_BROWSER = process.argv.includes("--browser");
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
-
-// Markers of bot walls. Matching is on lowercased HTML.
-const BLOCK_MARKERS = [
-  "captcha",
-  "access denied",
-  "robot or human",
-  "are you a robot",
-  "px-captcha",
-  "perimeterx",
-  "_incapsula_resource",
-  "datadome",
-  "cf-chl",
-  "challenge-platform",
-  "request unsuccessful",
-  "pardon our interruption",
-];
-
-const SYSTEM = `You read furniture product pages (or screenshots of their specs) and report the product's overall assembled dimensions.
-
-Rules:
-- Use assembled/overall product dimensions. Ignore package, box or shipping dimensions.
-- Width = side to side, depth = front to back, height = floor to top. Convert to inches (1 cm = 0.3937 in).
-- Seat height, arm height, clearance and similar go in sub_dimensions only.
-- Detect non-rectangular footprints (L-shaped sectionals, chaises, corner desks) and describe the extra dimensions.
-- If several sizes are listed, use the one the page has selected or lists first, and say which in variant_note.
-- Never guess. If the overall dimensions are not present, set found=false.`;
 
 interface Truth {
   width_in: number;
@@ -77,47 +56,19 @@ interface Accuracy {
   shapeCorrect: boolean | null;
 }
 
-function classify(status: number | null, html: string): Pick<FetchResult, "blocked" | "blockMarker"> {
-  const lower = html.toLowerCase();
-  const marker = BLOCK_MARKERS.find((m) => lower.includes(m)) ?? null;
-  // Product pages often mention "captcha" in a script tag even when served fine,
-  // so a marker only counts as a block on an error status or a tiny page.
-  const blocked = (status !== null && status >= 400) || (marker !== null && html.length < 200_000);
-  return { blocked, blockMarker: marker };
-}
-
-/** JSON-LD blocks (often carry dimensions verbatim) followed by visible text. */
-function pageText(html: string): string {
-  const jsonLd = [...html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)].map((m) =>
-    m[1].trim(),
-  );
-  const visible = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-  return [...jsonLd.map((j) => `JSON-LD:\n${j}`), `PAGE TEXT:\n${visible}`].join("\n\n");
-}
-
 async function plainFetch(url: string): Promise<FetchResult> {
   try {
-    const res = await fetch(url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(30_000),
-      headers: {
-        "User-Agent": UA,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
-    const html = await res.text();
-    const c = classify(res.status, html);
-    return { status: res.status, finalUrl: res.url, bytes: html.length, ...c, error: null, text: c.blocked ? null : pageText(html) };
+    const page = await safeFetch(url);
+    const b = detectBlock(page.status, page.html);
+    return {
+      status: page.status,
+      finalUrl: page.finalUrl,
+      bytes: page.html.length,
+      blocked: b.blocked,
+      blockMarker: b.marker,
+      error: null,
+      text: b.blocked ? null : pageText(page.html).text,
+    };
   } catch (err) {
     return { status: null, finalUrl: null, bytes: 0, blocked: false, blockMarker: null, error: (err as Error).message, text: null };
   }
@@ -137,8 +88,8 @@ async function browserFetch(url: string): Promise<FetchResult> {
       await page.waitForTimeout(4000); // let client-rendered spec tables load
       const html: string = await page.content();
       const status: number | null = res ? res.status() : null;
-      const c = classify(status, html);
-      return { status, finalUrl: page.url(), bytes: html.length, ...c, error: null, text: c.blocked ? null : pageText(html) };
+      const b = detectBlock(status, html);
+      return { status, finalUrl: page.url(), bytes: html.length, blocked: b.blocked, blockMarker: b.marker, error: null, text: b.blocked ? null : pageText(html).text };
     } finally {
       await page.close();
     }
@@ -150,8 +101,9 @@ async function browserFetch(url: string): Promise<FetchResult> {
 function score(truth: Truth | null, p: Product | null): Accuracy | null {
   if (!truth || !p) return null;
   const close = (a: number | null, b: number) => a !== null && Math.abs(a - b) <= Math.max(0.5, b * 0.01);
+  const d = draftFromProduct(p, null, "page");
   return {
-    dimsCorrect: p.found && close(p.width_in, truth.width_in) && close(p.depth_in, truth.depth_in) && close(p.height_in, truth.height_in),
+    dimsCorrect: p.found && close(d.width, truth.width_in) && close(d.depth, truth.depth_in) && close(d.height, truth.height_in),
     shapeCorrect: truth.shape ? p.footprint.shape === truth.shape : null,
   };
 }
@@ -167,7 +119,7 @@ async function safely(label: string, run: () => Promise<ExtractionRun<Product>>)
 }
 
 const readText = (label: string, text: string) =>
-  safely(label, () => extract(Product, SYSTEM, [{ kind: "text", text }], "Extract the product dimensions from this page."));
+  safely(label, () => extract(ProductReading, PRODUCT_SYSTEM, [{ kind: "text", text }], "Find this product's overall assembled size."));
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const mark = (a: Accuracy | null) => (!a ? "read" : a.dimsCorrect ? "✅" : "❌");
@@ -210,10 +162,10 @@ async function main() {
         const base64 = (await readFile(path.join(DIR, "screenshots", entry.screenshot))).toString("base64");
         shotRead = await safely("screenshot", () =>
           extract(
-            Product,
-            SYSTEM,
+            ProductReading,
+            PRODUCT_SYSTEM,
             [{ kind: "image", mediaType: shotType, base64 }],
-            "Extract the product dimensions from this screenshot.",
+            "Find this product's overall assembled size in this screenshot.",
           ),
         );
       }
@@ -233,7 +185,10 @@ async function main() {
       rows.push(row);
       for (const [label, read] of [["page", plainRead], ["browser", browserRead], ["screenshot", shotRead]] as const) {
         const o = read?.output;
-        if (o) console.log(`  ${label}: ${o.width_in} x ${o.depth_in} x ${o.height_in} in, ${o.footprint.shape}, ${o.dims_kind}`);
+        if (o) {
+          const d = draftFromProduct(o, null, "page");
+          console.log(`  ${label}: ${d.width} x ${d.depth} x ${d.height} in, ${o.footprint.shape}, ${o.dims_kind}`);
+        }
       }
 
       // Drop page text from the saved JSON; it is large and reproducible.

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { suggest, type RoomReport, type Rules, type Suggestion } from "../engine/index.ts";
 import type { InventoryItem, Placement, Result, Room } from "../model/types.ts";
+import { effectiveSize } from "../model/size.ts";
 import { formatLength, formatSize, type Units } from "../model/units.ts";
 
 const LABEL: Record<Result, string> = { fits: "Fits", tight: "Tight", "doesnt-fit": "Doesn't fit" };
@@ -108,7 +109,7 @@ function Selected({
   return (
     <div className="selected-tools">
       <small>
-        {formatSize(item.width, units)} × {formatSize(item.depth, units)} · rotated {Math.round(placement.rotation)}°
+        {formatSize(effectiveSize(item).width, units)} × {formatSize(effectiveSize(item).depth, units)} · rotated {Math.round(placement.rotation)}°
       </small>
       <div className="row wrap">
         <button className="secondary" onClick={() => rotate(-90)} aria-label="Rotate 90 degrees counterclockwise">

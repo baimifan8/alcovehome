@@ -1,9 +1,11 @@
 import { useState, type Dispatch } from "react";
 import library from "../data/library.json";
 import type { Rules } from "../engine/index.ts";
-import type { Footprint, InventoryItem, Space } from "../model/types.ts";
+import { effectiveSize } from "../model/size.ts";
+import type { AddOn, Footprint, InventoryItem, Space } from "../model/types.ts";
 import { formatSize, type Units } from "../model/units.ts";
 import { LengthInput } from "./LengthInput.tsx";
+import { ProductImport, ShapeFields } from "./ProductImport.tsx";
 import { newId, type Action } from "./store.ts";
 
 interface LibraryItem {
@@ -62,17 +64,32 @@ export function FurniturePanel({ inventory, space, roomId, rules, units, dispatc
     addOns: [],
   });
 
-  const dims = (i: InventoryItem) =>
-    `${formatSize(i.width, units)} W × ${formatSize(i.depth, units)} D × ${formatSize(i.height, units)} H${i.footprint.shape === "l" ? " · L-shaped" : ""}`;
+  const dims = (i: InventoryItem) => {
+    const e = effectiveSize(i);
+    return `${formatSize(e.width, units)} W × ${formatSize(e.depth, units)} D × ${formatSize(e.height, units)} H${i.footprint.shape === "l" ? " · L-shaped" : ""}`;
+  };
+  const origin = (i: InventoryItem) => {
+    const notes = [
+      i.overrides && Object.keys(i.overrides).length ? "your size" : i.source.type === "product" ? "store size" : i.source.type === "generic" ? "typical size" : "",
+    ];
+    const on = i.addOns.filter((a) => a.on).length;
+    if (on) notes.push(`${on} add-on${on === 1 ? "" : "s"} on`);
+    return notes.filter(Boolean).map((n) => ` · ${n}`).join("");
+  };
   const placedCount = (id: string) => space?.placements.filter((p) => p.itemId === id).length ?? 0;
 
   return (
     <div className="panel-body">
       <p className="hint">Your furniture is saved once and reused for every listing.</p>
 
+      <h3>From a store</h3>
+      <ProductImport rules={rules} units={units} onAdd={(item) => dispatch({ type: "addItem", item })} />
+
+      <h3>Common items</h3>
+
       <div className="row end">
         <label className="field grow">
-          <span>Common items (typical sizes)</span>
+          <span>Pick one (typical sizes)</span>
           <select value={libraryId} onChange={(e) => setLibraryId(e.target.value)}>
             {groups.map((g) => (
               <optgroup key={g.label} label={g.label}>
@@ -106,7 +123,7 @@ export function FurniturePanel({ inventory, space, roomId, rules, units, dispatc
       )}
 
       <h3>My furniture</h3>
-      {inventory.length === 0 && <p className="hint">Nothing yet. Add a common item above or enter your own sizes.</p>}
+      {inventory.length === 0 && <p className="hint">Nothing yet. Paste a store link, pick a common item, or enter your own sizes.</p>}
       <ul className="inventory">
         {inventory.map((i) => (
           <li key={i.id}>
@@ -114,7 +131,7 @@ export function FurniturePanel({ inventory, space, roomId, rules, units, dispatc
               <strong>{i.nickname || rules.itemKinds[i.kind]?.label}</strong>
               <small>
                 {dims(i)}
-                {i.source.type === "generic" ? " · typical size" : ""}
+                {origin(i)}
               </small>
             </div>
             <div className="actions">
@@ -154,15 +171,26 @@ function ItemEditor({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState(item);
-  const set = (patch: Partial<InventoryItem>) => setDraft({ ...draft, ...patch });
-  const fp = draft.footprint;
+  const set = (patch: Partial<InventoryItem>) => setDraft((d) => ({ ...d, ...patch }));
+  // Store sizes stay locked; changing them is a deliberate, labeled override.
+  const fromStore = draft.source.type === "product";
+  const [ownSize, setOwnSize] = useState(Boolean(item.overrides && Object.keys(item.overrides).length));
+  const o = draft.overrides ?? {};
+  const setOverride = (k: "width" | "depth" | "height", v: number) => set({ overrides: { ...o, [k]: v } });
+  const setAddOn = (a: AddOn) => set({ addOns: draft.addOns.map((x) => (x.id === a.id ? a : x)) });
+  const total = effectiveSize(draft);
 
   return (
     <form
       className="editor"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave({ ...draft, nickname: draft.nickname.trim() || rules.itemKinds[draft.kind]?.label || "Item" });
+        onSave({
+          ...draft,
+          nickname: draft.nickname.trim() || rules.itemKinds[draft.kind]?.label || "Item",
+          overrides: fromStore && ownSize && Object.keys(o).length ? o : undefined,
+          addOns: draft.addOns.map((a) => ({ ...a, label: a.label.trim() || "Add-on" })),
+        });
       }}
     >
       <h3>{isNew ? "New item" : `Edit ${item.nickname}`}</h3>
@@ -180,41 +208,76 @@ function ItemEditor({
           ))}
         </select>
       </label>
-      <div className="row">
-        <LengthInput label="Width" value={draft.width} units={units} bare="in" min={1} onChange={(width) => set({ width })} />
-        <LengthInput label="Depth" value={draft.depth} units={units} bare="in" min={1} onChange={(depth) => set({ depth })} />
-        <LengthInput label="Height" value={draft.height} units={units} bare="in" min={1} onChange={(height) => set({ height })} />
-      </div>
-      <label className="field">
-        <span>Shape</span>
-        <select
-          value={fp.shape}
-          onChange={(e) =>
-            set({
-              footprint:
-                e.target.value === "l"
-                  ? { shape: "l", side: "left", returnWidth: Math.round(draft.width / 3), returnDepth: Math.round(draft.depth * 1.8) }
-                  : { shape: "rect" },
-            })
-          }
-        >
-          <option value="rect">Rectangle</option>
-          <option value="l">L-shaped (sectional, corner desk)</option>
-        </select>
-      </label>
-      {fp.shape === "l" && (
-        <div className="row">
-          <label className="field">
-            <span>Chaise / return on the</span>
-            <select value={fp.side} onChange={(e) => set({ footprint: { ...fp, side: e.target.value as "left" | "right" } })}>
-              <option value="left">Left</option>
-              <option value="right">Right</option>
-            </select>
+
+      {fromStore ? (
+        <>
+          <p className="hint">
+            Store size: {formatSize(draft.width, units)} W × {formatSize(draft.depth, units)} D × {formatSize(draft.height, units)} H{" "}
+            {draft.source.type === "product" && (
+              <a href={draft.source.url} target="_blank" rel="noopener noreferrer">
+                product page ↗
+              </a>
+            )}
+          </p>
+          <label className="inline">
+            <input
+              type="checkbox"
+              checked={ownSize}
+              onChange={(e) => {
+                setOwnSize(e.target.checked);
+                if (!e.target.checked) set({ overrides: undefined });
+              }}
+            />{" "}
+            Use my own size instead (for example, it was measured differently)
           </label>
-          <LengthInput label="Return width" value={fp.returnWidth} units={units} bare="in" min={1} onChange={(returnWidth) => set({ footprint: { ...fp, returnWidth } })} />
-          <LengthInput label="Depth at the return" value={fp.returnDepth} units={units} bare="in" min={1} onChange={(returnDepth) => set({ footprint: { ...fp, returnDepth } })} />
+          {ownSize && (
+            <div className="row">
+              <LengthInput label="Your width" value={o.width ?? draft.width} units={units} bare="in" min={1} onChange={(v) => setOverride("width", v)} />
+              <LengthInput label="Your depth" value={o.depth ?? draft.depth} units={units} bare="in" min={1} onChange={(v) => setOverride("depth", v)} />
+              <LengthInput label="Your height" value={o.height ?? draft.height} units={units} bare="in" min={1} onChange={(v) => setOverride("height", v)} />
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="row">
+          <LengthInput label="Width" value={draft.width} units={units} bare="in" min={1} onChange={(width) => set({ width })} />
+          <LengthInput label="Depth" value={draft.depth} units={units} bare="in" min={1} onChange={(depth) => set({ depth })} />
+          <LengthInput label="Height" value={draft.height} units={units} bare="in" min={1} onChange={(height) => set({ height })} />
         </div>
       )}
+      <ShapeFields footprint={draft.footprint} width={draft.width} depth={draft.depth} units={units} onChange={(footprint) => set({ footprint })} />
+
+      <h3>Add-ons</h3>
+      <p className="hint">Extras that make it bigger, like a monitor arm (+6 in deep), a hutch (+30 in tall) or a table leaf (+18 in wide). Switch them on or off.</p>
+      {draft.addOns.map((a) => (
+        <fieldset key={a.id} className="addon">
+          <legend>
+            <label className="inline">
+              <input type="checkbox" checked={a.on} onChange={(e) => setAddOn({ ...a, on: e.target.checked })} /> On
+            </label>
+            <input type="text" aria-label="Add-on name" value={a.label} placeholder="e.g. Monitor arm" onChange={(e) => setAddOn({ ...a, label: e.target.value })} />
+            <button type="button" className="link" onClick={() => set({ addOns: draft.addOns.filter((x) => x.id !== a.id) })}>
+              Remove
+            </button>
+          </legend>
+          <div className="row">
+            <LengthInput label="+ Width" value={a.width} units={units} bare="in" onChange={(width) => setAddOn({ ...a, width })} />
+            <LengthInput label="+ Depth" value={a.depth} units={units} bare="in" onChange={(depth) => setAddOn({ ...a, depth })} />
+            <LengthInput label="+ Height" value={a.height} units={units} bare="in" onChange={(height) => setAddOn({ ...a, height })} />
+          </div>
+        </fieldset>
+      ))}
+      <button
+        type="button"
+        className="secondary"
+        onClick={() => set({ addOns: [...draft.addOns, { id: newId(), label: "", width: 0, depth: 0, height: 0, on: true }] })}
+      >
+        + Add-on
+      </button>
+
+      <p className="hint">
+        Size used for fitting: {formatSize(total.width, units)} W × {formatSize(total.depth, units)} D × {formatSize(total.height, units)} H
+      </p>
       <div className="row">
         <button type="submit">Save</button>
         <button type="button" className="secondary" onClick={onCancel}>

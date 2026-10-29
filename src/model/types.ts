@@ -76,6 +76,7 @@ export type Footprint =
 export interface AddOn {
   id: string;
   label: string;
+  /** Inches added to the overall width, depth and height. */
   width: number;
   depth: number;
   height: number;
@@ -88,10 +89,14 @@ export interface InventoryItem {
   /** Item kind, which selects its use zones in rules.json. */
   kind: string;
   source: { type: "generic"; libraryId: string } | { type: "manual" } | { type: "product"; url: string };
+  /** Base size: for products the store's size (locked), otherwise what the user entered. */
   width: number;
   depth: number;
   height: number;
   footprint: Footprint;
+  /** The user's own sizes, used instead of the base ones and labeled as theirs. */
+  overrides?: { width?: number; depth?: number; height?: number };
+  /** Extras that add to the size when on (monitor arm, hutch, table leaf). */
   addOns: AddOn[];
 }
 
