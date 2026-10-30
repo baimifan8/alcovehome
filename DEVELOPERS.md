@@ -54,6 +54,8 @@ npm test
 npm run build
 ```
 
+GitHub runs the same checks on every pull request and every push to `main` (`.github/workflows/checks.yml`): clean install, typecheck, tests, build, on Node 22. They need no secrets and never call the Claude API. Node 22.13 or newer is required (`engines` in `package.json`; pdf.js needs it).
+
 Production is one Node process that serves `dist/` and the API:
 
 ```bash

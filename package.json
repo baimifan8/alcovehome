@@ -2,6 +2,9 @@
   "name": "alcovehome",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -p . && vite build",
