@@ -48,4 +48,4 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 
 ## For developers
 
-Setup, testing and how the fit checks work are in [DEVELOPERS.md](DEVELOPERS.md). The full product plan is in SPEC.md.
+Setup, testing and how the fit checks work are in [DEVELOPERS.md](DEVELOPERS.md). The full product plan is in [SPEC.md](SPEC.md).

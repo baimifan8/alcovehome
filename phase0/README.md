@@ -1,6 +1,6 @@
 # Phase 0 · Proof tests
 
-Two cheap tests that decide whether Alcove Home's two AI-reading features are realistic before any app is built (see SPEC.md, "Phased build plan").
+Two cheap tests that decide whether Alcove Home's two AI-reading features are realistic before any app is built (see [SPEC.md](../SPEC.md), "Phased build plan").
 
 | Test | Question it answers | Script | Output |
 | --- | --- | --- | --- |
