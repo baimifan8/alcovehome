@@ -2,7 +2,7 @@
 // a floor plan picture, the listing's text, or typed room sizes.
 
 import { useEffect, useRef, useState } from "react";
-import { prepareImage, readFloorPlan, type PlanImage } from "../import/client.ts";
+import { isPdf, openPdf, prepareImage, readFloorPlan, type PdfPlan, type PlanImage } from "../import/client.ts";
 import { draftFromReading, draftFromText, type DraftPlan } from "../import/draft.ts";
 import { parseListingText } from "../import/labels.ts";
 import type { Units } from "../model/units.ts";
@@ -70,13 +70,41 @@ function PictureInput({ onRead }: { onRead: (draft: DraftPlan, image: PlanImage)
   const abort = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  /** A PDF with more than one page: which page is the floor plan. */
+  const [pdf, setPdf] = useState<{ plan: PdfPlan; page: number } | null>(null);
+  const [opening, setOpening] = useState(false);
+
   const take = async (file: Blob | null | undefined) => {
     if (!file) return;
     setError(null);
+    setPdf(null);
     try {
-      setImage(await prepareImage(file));
+      if (isPdf(file)) {
+        setOpening(true);
+        const plan = await openPdf(file);
+        // Floor plans are often not on the first page of a brochure: let people pick.
+        if (plan.pages > 1) setPdf({ plan, page: 1 });
+        setImage(await plan.render(1));
+      } else {
+        setImage(await prepareImage(file));
+      }
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setOpening(false);
+    }
+  };
+  const showPage = async (page: number) => {
+    if (!pdf) return;
+    setError(null);
+    setPdf({ ...pdf, page });
+    setOpening(true);
+    try {
+      setImage(await pdf.plan.render(page));
+    } catch {
+      setError("Couldn't draw that page. Try another one.");
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -126,21 +154,35 @@ function PictureInput({ onRead }: { onRead: (draft: DraftPlan, image: PlanImage)
         {image ? (
           <img src={image.dataUrl} alt="Floor plan to read" />
         ) : (
-          <span>Paste a screenshot of the floor plan, drop a picture here, or tap to choose one.</span>
+          <span>Paste a screenshot of the floor plan, drop a picture or PDF here, or tap to choose one.</span>
         )}
       </div>
       <input
         ref={fileInput}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf"
         hidden
-        aria-label="Floor plan picture"
+        aria-label="Floor plan picture or PDF"
         onChange={(e) => void take(e.target.files?.[0])}
       />
+      {pdf && (
+        <div className="row pdf-pages">
+          <button className="secondary" disabled={busy || opening || pdf.page <= 1} onClick={() => void showPage(pdf.page - 1)} aria-label="Previous page">
+            ‹
+          </button>
+          <span>
+            Page {pdf.page} of {pdf.plan.pages}
+          </span>
+          <button className="secondary" disabled={busy || opening || pdf.page >= pdf.plan.pages} onClick={() => void showPage(pdf.page + 1)} aria-label="Next page">
+            ›
+          </button>
+          <span className="hint">Pick the page with the floor plan.</span>
+        </div>
+      )}
       <p className="hint">Works best with a plan that has room sizes printed on it. You'll check everything before it's used.</p>
       {error && <p className="error">{error}</p>}
       <div className="row">
-        <button disabled={!image || busy} onClick={read}>
+        <button disabled={!image || busy || opening} onClick={read}>
           {busy ? "Reading the plan…" : "Read floor plan"}
         </button>
         {busy && (
@@ -149,11 +191,18 @@ function PictureInput({ onRead }: { onRead: (draft: DraftPlan, image: PlanImage)
           </button>
         )}
         {image && !busy && (
-          <button className="link" onClick={() => setImage(null)}>
+          <button
+            className="link"
+            onClick={() => {
+              setImage(null);
+              setPdf(null);
+            }}
+          >
             Use a different picture
           </button>
         )}
       </div>
+      {opening && <p className="hint">Opening the PDF…</p>}
       {busy && <p className="hint">This can take up to a minute.</p>}
     </div>
   );

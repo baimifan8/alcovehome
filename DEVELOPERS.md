@@ -113,8 +113,9 @@ listing text ──parseListingText──▶ draftFromText ───────
 - `server/`: `index.ts` (API plus static files), `claude.ts` (shared structured-output call, model chosen per reading by `modelFor`; also used by Phase 0), `imageSize.ts`.
 - Pictures are kept in IndexedDB (`Space.sourceImage`), not localStorage.
 - Rooms from listing text set `Room.approximate`, which marks every verdict in them approximate.
+- PDFs are drawn in the browser with pdf.js (`openPdf` in `src/import/client.ts`, loaded only when a PDF is chosen; the worker ships as a `.mjs` asset, which the server serves as JavaScript). The chosen page is rendered at 1568 px on the long side and from then on is just a picture: same reading, overlay and saved copy. Several pages: the person picks the page. Password-protected or broken PDFs get a plain message. The PDF itself never leaves the device.
 - Images are shrunk to 1568 px on the long side before sending, so the pixel positions Claude reports match the image the overlay draws on.
-- Not yet: PDF pages, non-rectangular rooms from images (the reading gives each room's bounding box), angled or curved built-ins (planned as their bounding rectangle), dragging doors or built-ins on the overlay (positions are typed fields, as the spec asks).
+- Not yet: non-rectangular rooms from images (the reading gives each room's bounding box), angled or curved built-ins (planned as their bounding rectangle), dragging doors or built-ins on the overlay (positions are typed fields, as the spec asks).
 
 ## Furniture import (Phase 3)
 

@@ -1,5 +1,5 @@
-// Browser side of floor plan import: shrink the picture, send it to the server,
-// keep a copy on the device.
+// Browser side of floor plan import: shrink the picture (or draw a PDF page as one),
+// send it to the server, keep a copy on the device.
 
 import { PlanReading } from "./reading.ts";
 
@@ -38,6 +38,46 @@ export async function prepareImage(file: Blob): Promise<PlanImage> {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+export const isPdf = (file: Blob) => file.type === "application/pdf" || (file instanceof File && /\.pdf$/i.test(file.name));
+
+/** An open PDF: how many pages it has, and any page drawn as a floor plan picture. */
+export interface PdfPlan {
+  pages: number;
+  render: (page: number) => Promise<PlanImage>;
+}
+
+/**
+ * Open a PDF in the browser (pdf.js, loaded only when needed). Pages are drawn at
+ * the same size limit as pictures, so the rest of the import works unchanged.
+ */
+export async function openPdf(file: Blob): Promise<PdfPlan> {
+  const [pdfjs, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]);
+  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  let doc: Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
+  try {
+    doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), enableXfa: false }).promise;
+  } catch (err) {
+    const locked = (err as Error).name === "PasswordException";
+    throw new Error(locked ? "That PDF is password-protected. Save the floor plan page as a picture instead." : "Couldn't open that PDF. Try a screenshot of the floor plan instead.");
+  }
+  return {
+    pages: doc.numPages,
+    render: async (n) => {
+      const page = await doc.getPage(n);
+      const base = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: MAX_SIDE / Math.max(base.width, base.height) });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+      return { dataUrl: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
+    },
+  };
 }
 
 export async function readFloorPlan(image: PlanImage, signal?: AbortSignal): Promise<PlanReading> {
