@@ -12,6 +12,7 @@ Each file in `cases/` is one layout. `golden.test.ts` builds the room and items 
   - The shared entry door (`wall: bottom, offset: 106, width: 32, hinge: right`) spans x = 6…38 on the bottom wall, hinged at x = 6, swinging into the room.
 - Items: `x`, `y` = center of the bounding box. `rotation` is in degrees, clockwise on screen. At 0 the item's back faces the top of the plan and its front faces down.
 - L footprints: `width` × `depth` is the main body. The return (`returnWidth` wide) extends the depth to `returnDepth` on the given side.
+- Built-ins (`room.builtIns`): `x`, `y` = top-left corner, `width` along x, `length` along y. Nothing can be placed on them; they're never blamed for a narrow walkway (the room is).
 - Defaults: `confirmed: true`, `operation: swing`, `swing: in`, `hinge: left`; every wall is `labeled` unless `wallSources` says otherwise.
 - `expect.codes` must match the item's reason codes exactly. `fits` means no reasons. `approximate` is checked only when given.
 
@@ -24,5 +25,6 @@ Each file in `cases/` is one layout. `golden.test.ts` builds the room and items 
 | `item-overlap` | 0 | Footprint overlaps another item |
 | `door` | 0 | Inside a door's swing arc or the strip in front of a doorway |
 | `closet-door` | 0 | Same, for a closet door |
-| `use-zone` | 1 | A use zone (chair pull-out, drawers, bed side access…) is cut by an item or wall |
+| `built-in` | 0 | Footprint overlaps a built-in (kitchen island, counter, radiator, fireplace…) |
+| `use-zone` | 1 | A use zone (chair pull-out, drawers, bed side access…) is cut by an item, a built-in or a wall |
 | `walkway` | 2 | Item narrows the walkway from the entry below the minimum |

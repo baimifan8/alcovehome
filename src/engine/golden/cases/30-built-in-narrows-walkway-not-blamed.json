@@ -1,0 +1,5 @@
+{ "name": "A built-in counter leaves 29 in to the closet: the room's problem, not the nightstand's",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}, {"id":"closet","type":"closet_door","wall":"top","offset":100,"width":40,"operation":"sliding"}],
+    "builtIns": [{ "id": "counter", "label": "counter", "x": 29, "y": 50, "width": 115, "length": 20 }] },
+  "items": [{ "id": "nightstand", "kind": "generic", "width": 18, "depth": 18, "x": 133, "y": 109, "rotation": 0 }],
+  "expect": { "nightstand": { "result": "fits", "codes": [] } } }

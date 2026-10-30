@@ -1,0 +1,5 @@
+{ "name": "Radiator 20 in behind the desk cuts the 36 in chair pull-out: tight",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}],
+    "builtIns": [{ "id": "radiator", "label": "radiator", "x": 50, "y": 44, "width": 48, "length": 10 }] },
+  "items": [{ "id": "desk", "kind": "desk", "width": 48, "depth": 24, "x": 74, "y": 12, "rotation": 0 }],
+  "expect": { "desk": { "result": "tight", "codes": ["use-zone"] } } }
