@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { evaluateRoom } from "../engine/index.ts";
 import { saveImage, type PlanImage } from "../import/client.ts";
 import { draftToRoom, type DraftPlan, type DraftRoom } from "../import/draft.ts";
@@ -14,6 +14,7 @@ import { SettingsDialog } from "./SettingsDialog.tsx";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { SharedPlanView } from "./SharedPlanView.tsx";
 import { findSpot, load, newId, reducer, rulesFor, save, shapedRoom } from "./store.ts";
+import { countClick, mark, startRun, timing } from "./timing.ts";
 import { VerdictPanel } from "./VerdictPanel.tsx";
 
 export function App() {
@@ -50,6 +51,28 @@ export function App() {
     setShared(null);
   };
 
+  // Timed test runs: start from Settings, or open the app with ?timed on the test device.
+  const timed = useSyncExternalStore(timing.subscribe, timing.get).active;
+  useEffect(() => {
+    const url = new URL(location.href);
+    if (!url.searchParams.has("timed")) return;
+    url.searchParams.delete("timed");
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+    startRun();
+    setCreating(true);
+  }, []);
+  useEffect(() => {
+    if (!timed) return;
+    const onClick = () => countClick();
+    window.addEventListener("pointerdown", onClick);
+    return () => window.removeEventListener("pointerdown", onClick);
+  }, [timed !== null]);
+  const inventorySize = useRef(state.inventory.length);
+  useEffect(() => {
+    if (state.inventory.length > inventorySize.current) mark("furniture-added");
+    inventorySize.current = state.inventory.length;
+  }, [state.inventory.length]);
+
   const rules = useMemo(() => rulesFor(state.settings), [state.settings]);
   const space = state.spaces.find((s) => s.id === state.current.spaceId) ?? null;
   const room = space?.rooms.find((r) => r.id === state.current.roomId) ?? space?.rooms[0] ?? null;
@@ -60,6 +83,12 @@ export function App() {
     () => (room ? evaluateRoom({ room, items: state.inventory, placements }, rules, { skipWalkway: dragging, format }) : null),
     [room, state.inventory, placements, rules, dragging, format],
   );
+
+  // The run ends at the first fit answer on a plan made during the run.
+  const showingPlan = !creating && !pending && !shared;
+  useEffect(() => {
+    if (timed?.marks["rooms-confirmed"] !== undefined && showingPlan && report && report.verdicts.length > 0) mark("first-answer");
+  }, [timed, showingPlan, report]);
 
   const move = (p: Placement, final = true) => {
     setDragging(!final);
@@ -87,6 +116,7 @@ export function App() {
 
   const confirmDraft = async (rooms: DraftRoom[]) => {
     if (!pending) return;
+    mark("rooms-confirmed");
     const id = newId();
     const saved = pending.image ? await saveImage(id, pending.image) : false;
     dispatch({
@@ -145,10 +175,18 @@ export function App() {
         hasSpaces={state.spaces.length > 0}
         onCancel={() => setCreating(false)}
         onTyped={(name, roomName, shape) => {
+          // Typed sizes are added, read and checked in one step.
+          mark("plan-added");
+          mark("plan-read");
+          mark("rooms-confirmed");
           dispatch({ type: "createSpace", name, rooms: [shapedRoom(roomName, shape)] });
           startPlan();
         }}
-        onDraft={(name, draft, image) => setPending({ name, draft, image })}
+        onDraft={(name, draft, image) => {
+          mark("plan-added"); // listing text: added and read at once
+          mark("plan-read");
+          setPending({ name, draft, image });
+        }}
       />
     );
   }
@@ -178,6 +216,11 @@ export function App() {
           Share
         </button>
         <span className="spacer" />
+        {timed && (
+          <span className="timed-chip" title="A timed test run is on. See Settings for results.">
+            ● Timed run
+          </span>
+        )}
         <button className="secondary" onClick={() => setSettingsOpen(true)}>
           Settings
         </button>
@@ -256,6 +299,12 @@ export function App() {
         settings={state.settings}
         onChange={(settings) => dispatch({ type: "settings", settings })}
         onClose={() => setSettingsOpen(false)}
+        onStartRun={() => {
+          startRun();
+          setSettingsOpen(false);
+          setSelected(null);
+          setCreating(true);
+        }}
       />
     </div>
   );

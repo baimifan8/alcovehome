@@ -8,6 +8,7 @@ import { parseListingText } from "../import/labels.ts";
 import type { Units } from "../model/units.ts";
 import { clampShape, type Notch, type RoomShape } from "../model/shape.ts";
 import { LengthInput } from "./LengthInput.tsx";
+import { mark } from "./timing.ts";
 import { ShapeFields } from "./RoomPanel.tsx";
 
 type Mode = "picture" | "text" | "type";
@@ -90,6 +91,7 @@ function PictureInput({ onRead }: { onRead: (draft: DraftPlan, image: PlanImage)
       } else {
         setImage(await prepareImage(file));
       }
+      mark("plan-added");
     } catch (err) {
       setError((err as Error).message);
     } finally {
