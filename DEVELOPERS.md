@@ -2,7 +2,7 @@
 
 Will the furniture you already own fit in this home? Type a room's size from a listing, add your furniture, and get a fits / tight / doesn't-fit verdict for every piece, with the reason.
 
-See SPEC.md for the product spec and phased plan.
+See [SPEC.md](SPEC.md) for the product spec and phased plan.
 
 ## Status
 
