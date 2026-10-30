@@ -4,12 +4,15 @@ import { saveImage, type PlanImage } from "../import/client.ts";
 import { draftToRoom, type DraftPlan, type DraftRoom } from "../import/draft.ts";
 import type { InventoryItem, Placement } from "../model/types.ts";
 import { formatLength } from "../model/units.ts";
+import { adoptSharedPlan, isShareHash, readShareHash, type SharedPlan } from "../share/share.ts";
 import { FurniturePanel } from "./FurniturePanel.tsx";
 import { ConfirmPlan } from "./ConfirmPlan.tsx";
 import { NewListing } from "./NewListing.tsx";
 import { PlanView } from "./PlanView.tsx";
 import { RoomPanel } from "./RoomPanel.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
+import { ShareDialog } from "./ShareDialog.tsx";
+import { SharedPlanView } from "./SharedPlanView.tsx";
 import { findSpot, load, newId, rectRoom, reducer, rulesFor, save } from "./store.ts";
 import { VerdictPanel } from "./VerdictPanel.tsx";
 
@@ -19,6 +22,9 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  /** A plan opened from a share link: still reading it, unreadable, or ready to view. */
+  const [shared, setShared] = useState<SharedPlan | "loading" | "broken" | null>(() => (isShareHash(location.hash) ? "loading" : null));
   const [creating, setCreating] = useState(false);
   /** A floor plan or listing text that has been read and is waiting to be checked. */
   const [pending, setPending] = useState<{ name: string; draft: DraftPlan; image: PlanImage | null } | null>(null);
@@ -28,6 +34,21 @@ export function App() {
     const t = setTimeout(() => save(state), 200);
     return () => clearTimeout(t);
   }, [state, dragging]);
+
+  useEffect(() => {
+    const open = () => {
+      if (!isShareHash(location.hash)) return;
+      setShared("loading");
+      void readShareHash(location.hash).then((plan) => setShared(plan ?? "broken"));
+    };
+    open();
+    window.addEventListener("hashchange", open);
+    return () => window.removeEventListener("hashchange", open);
+  }, []);
+  const closeShared = () => {
+    history.replaceState(null, "", location.pathname + location.search);
+    setShared(null);
+  };
 
   const rules = useMemo(() => rulesFor(state.settings), [state.settings]);
   const space = state.spaces.find((s) => s.id === state.current.spaceId) ?? null;
@@ -78,6 +99,32 @@ export function App() {
     startPlan();
   };
 
+  if (shared === "loading") return <p className="hint shared-message">Opening the shared plan…</p>;
+  if (shared === "broken") {
+    return (
+      <div className="welcome shared-message">
+        <h1>Alcove Home</h1>
+        <p>This share link doesn't work. It may have been cut off when it was sent. Ask for the link again, or copy the whole thing.</p>
+        <button onClick={closeShared}>{state.spaces.length ? "Go to my listings" : "Start my own plan"}</button>
+      </div>
+    );
+  }
+  if (shared) {
+    return (
+      <SharedPlanView
+        plan={shared}
+        units={units}
+        onClose={closeShared}
+        onSave={() => {
+          const { space: copy, items } = adoptSharedPlan(shared, state.inventory, newId);
+          dispatch({ type: "importSpace", space: copy, items });
+          closeShared();
+          startPlan();
+        }}
+      />
+    );
+  }
+
   if (pending) {
     return (
       <ConfirmPlan
@@ -126,6 +173,9 @@ export function App() {
         </select>
         <button className="secondary" onClick={() => setCreating(true)}>
           New listing
+        </button>
+        <button className="secondary" onClick={() => setShareOpen(true)}>
+          Share
         </button>
         <span className="spacer" />
         <button className="secondary" onClick={() => setSettingsOpen(true)}>
@@ -198,6 +248,8 @@ export function App() {
           />
         )}
       </aside>
+
+      <ShareDialog open={shareOpen} space={space} inventory={state.inventory} clearances={state.settings.clearances} onClose={() => setShareOpen(false)} />
 
       <SettingsDialog
         open={settingsOpen}

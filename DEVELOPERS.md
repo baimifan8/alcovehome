@@ -141,6 +141,20 @@ link ──normalize──▶ shared cache hit? ──yes──▶ confirm (save
 - Store sizes are locked in the item editor. "Use my own size" sets `InventoryItem.overrides`, which is shown as "your size".
 - The Phase 0 store test now uses the same fetcher, page cleanup, prompt and conversion.
 
+## Share links
+
+```
+Space ──planToShare──▶ JSON ──deflate-raw──▶ base64url ──▶ <app>#share=…
+#share=… ──base64url──▶ inflate (≤512 KB) ──zod──▶ SharedPlan ──▶ SharedPlanView ──"Save a copy"──▶ adoptSharedPlan ──▶ importSpace
+```
+
+- `src/share/share.ts`: the whole plan is in the URL **fragment**, so browsers never send it to the server. No storage, no accounts, works offline. A one-room plan with one piece is about 500 characters; the dialog warns above 8,000.
+- A link carries the space's rooms, placements, only the inventory items placed in it, and the sender's clearance overrides (the viewer uses them so the verdicts match; a saved copy uses the recipient's settings). `sourceImage` is left out (the picture lives in the sender's IndexedDB and is too big for a link).
+- Links are untrusted input: decompression stops at 512 KB, everything is validated by a strict zod schema with size and count limits, product links must be `http(s)`, opening walls must exist, and placements pointing at missing rooms or items are dropped. Anything else gives a "this link doesn't work" screen.
+- The viewer is read-only (`readOnly` on `PlanView` and `VerdictPanel`: select, but no drag, rotate, remove or suggestions).
+- Saving a copy gives the space a new id. A shared item identical to one already in the recipient's inventory (same id and content, e.g. sharing to yourself) is reused; others get new ids so they can't clash with or overwrite the recipient's own furniture.
+- Links are snapshots; there's no live sync.
+
 ## Not built yet
 
-Share links, the browser extension, round tables (planned as their bounding rectangle), accounts, and limits shared across several servers.
+The browser extension, round tables (planned as their bounding rectangle), accounts, and limits shared across several servers.

@@ -24,6 +24,7 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 - **Move things around** by dragging them on the floor plan and turning them. Pieces line up neatly against walls and each other.
 - **Get suggestions.** If something doesn't fit, the app can suggest a small move or a turn that would help.
 - **See how sure each answer is.** If an answer depends on a wall size that was measured from the drawing rather than printed on the plan, it's marked as approximate.
+- **Share a plan.** Send someone a link and they see your rooms, where the furniture goes and whether each piece fits. They can look but not move anything, or save their own copy to try changes. The plan travels inside the link itself, so nothing is uploaded and nobody needs an account. The link shows the plan as it was when you shared it (share again after changes), and it doesn't include the original floor plan picture.
 - **Keep several listings.** Your furniture list is saved once and reused for every home you look at. The original floor plan picture is kept too, so you can look at it again.
 - **Use it on your phone or computer.** It opens in a web browser, and you can add it to your home screen like an app. No sign-up. Your plans stay on your own device.
 
@@ -31,8 +32,7 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 
 1. **Try the reading on real listings and real store pages.** Reading floor plans and store pages has been checked with samples, but not yet with real listings and stores. That needs access to the reading service, plus a set of real floor plans and store links.
 2. **Check the five-minute goal with real people.** A new person should get from a floor plan screenshot to a fit answer in under five minutes. Everything needed is in place, but it hasn't been timed with real users yet.
-3. **Share a plan.** Send someone a link to see your layout.
-4. **Save furniture from a store page in one click**, with a browser add-on.
+3. **Save furniture from a store page in one click**, with a browser add-on.
 
 ## Progress
 
@@ -42,6 +42,7 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 | Room planner | Type room sizes, place furniture, get answers | ✅ Done and checked |
 | Floor plans from pictures | Paste a screenshot instead of typing, then check it | Built and checked with a sample plan; not yet tried on a real listing |
 | Furniture from store links | Paste a link (or a screenshot) instead of typing sizes; add extras | Built and checked with sample pages; not yet tried on real stores or timed with real users |
+| Sharing | Send someone a link to see your plan | ✅ Done and checked |
 
 ## For developers
 
