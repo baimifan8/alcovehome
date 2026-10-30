@@ -34,6 +34,16 @@ export const PlanReading = z.object({
       confidence: Confidence,
     }),
   ),
+  built_ins: z.array(
+    z.object({
+      label: z.string().describe("What it is, in plain words: 'kitchen island', 'counter', 'fireplace', 'radiator', 'built-in shelves'."),
+      room: z.string().describe("Name of the room it is in."),
+      bbox_px: z
+        .object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() })
+        .describe("Its footprint on the floor in image pixels, origin at the image's top-left."),
+      confidence: Confidence,
+    }),
+  ),
   warnings: z.array(z.string()).describe("Anything ambiguous: unreadable labels, conflicting numbers, cropped areas."),
 });
 
@@ -47,6 +57,7 @@ Rules:
 - Give positions in the image's own pixel coordinates (origin top-left). The image size is stated in the request.
 - bbox_px is the inside of the room's walls, not the wall lines themselves.
 - Doors: report the swing direction from the drawn arc and which end the hinge is at. Closet doors are closet_door; bifold or sliding closet doors use swing "sliding".
+- Built-ins are fixed things furniture can't be placed on: kitchen islands and peninsulas, counters and cabinet runs (one per straight run, appliances included), built-in shelving, desks or benches, fireplaces and hearths, radiators, columns, stairs, bathtubs, showers, vanities and toilets. Report each with its floor footprint. Don't report furniture drawn only for decoration (beds, sofas, tables, rugs).
 - Never invent a printed number. If a label is unreadable, say so in warnings and lower that room's confidence.
 - Use confidence "low" for anything a person should double-check.`;
 

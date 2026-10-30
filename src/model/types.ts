@@ -20,6 +20,8 @@ export interface Room {
   /** One entry per wall, same order as outline. */
   wallSources: WallSource[];
   openings: Opening[];
+  /** Fixed things nothing can be placed on: kitchen islands, counters, radiators, fireplaces. */
+  builtIns?: BuiltIn[];
   /** True when the shape and doors are guesses (e.g. sizes from listing text only). */
   approximate?: boolean;
 }
@@ -45,6 +47,21 @@ export interface Opening {
   /** The opening people enter the room through. Defaults to the first door or passage. */
   entry?: boolean;
   /** False until the user has checked it (imported openings start unconfirmed). */
+  confirmed: boolean;
+}
+
+/** A built-in, as an axis-aligned rectangle in room coordinates. */
+export interface BuiltIn {
+  id: string;
+  /** What it is, as people say it: "kitchen island", "radiator". */
+  label: string;
+  /** Top-left corner. */
+  x: number;
+  y: number;
+  /** Size along x (left to right) and y (top to bottom). */
+  width: number;
+  length: number;
+  /** False until the user has checked it (read from a floor plan, not yet confirmed). */
   confirmed: boolean;
 }
 
@@ -119,6 +136,7 @@ export type ReasonCode =
   | "item-overlap"
   | "door"
   | "closet-door"
+  | "built-in"
   | "use-zone"
   | "walkway";
 

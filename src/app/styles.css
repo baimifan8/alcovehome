@@ -795,3 +795,35 @@ a {
 .shared-message {
   padding: 2rem 1rem;
 }
+
+/* Built-ins: fixed, so drawn in the wall colors */
+.built-in rect {
+  fill: var(--line);
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.built-in.unconfirmed rect {
+  stroke-dasharray: 4 3;
+}
+.built-in-label {
+  font-size: 6px;
+  fill: var(--muted);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+.draft-built-in {
+  fill: rgba(102, 112, 106, 0.3);
+  stroke: #444;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.draft-built-in.doubtful {
+  fill: rgba(222, 150, 20, 0.25);
+  stroke: #b97a07;
+  stroke-dasharray: 6 4;
+}
+fieldset.opening legend input[type="text"] {
+  width: auto;
+  max-width: 12rem;
+}

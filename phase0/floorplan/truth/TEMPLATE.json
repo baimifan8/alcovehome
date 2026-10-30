@@ -2,8 +2,8 @@
   "image": "plan-01.png",
   "source_note": "Where the screenshot came from (site, listing type). No URLs to private listings.",
   "rooms": [
-    { "name": "Living Room", "aliases": ["Living"], "width_in": 186, "length_in": 144, "doors": 1, "windows": 2 },
+    { "name": "Living Room", "aliases": ["Living"], "width_in": 186, "length_in": 144, "doors": 1, "windows": 2, "built_ins": 1 },
     { "name": "Bedroom 2", "width_in": 132, "length_in": 144, "doors": 1, "windows": 1, "closets": 1 },
-    { "name": "Bath", "width_in": null, "length_in": null, "doors": 1, "windows": 0 }
+    { "name": "Bath", "width_in": null, "length_in": null, "doors": 1, "windows": 0, "built_ins": 3 }
   ]
 }

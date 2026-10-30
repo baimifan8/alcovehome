@@ -76,6 +76,43 @@ describe("evaluateRoom", () => {
   });
 });
 
+describe("built-ins", () => {
+  const closet = { id: "c", type: "closet_door" as const, wall: 0, offset: 100, width: 40, operation: "sliding" as const, swing: "in" as const, hinge: "left" as const, confirmed: true };
+  const builtIn = (id: string, label: string, x: number, y: number, width: number, length: number) => ({ id, label, x, y, width, length, confirmed: true });
+  const messages = (report: ReturnType<typeof evaluateRoom>) => report.verdicts.flatMap((v) => v.reasons.map((r) => r.message));
+
+  it("names the built-in a piece sits on or whose use zone it cuts", () => {
+    const desk = [item("d", "desk", 48, 24)];
+    const onIt = evaluateRoom({ room: { ...room, builtIns: [builtIn("k", "kitchen counter", 60, 0, 48, 20)] }, items: desk, placements: [{ id: "p", itemId: "d", roomId: "r", x: 40, y: 12, rotation: 0 }] }, defaultRules);
+    expect(messages(onIt)).toContain("overlaps the kitchen counter by 4 in");
+    const behind = evaluateRoom({ room: { ...room, builtIns: [builtIn("h", "radiator", 50, 44, 48, 10)] }, items: desk, placements: [{ id: "p", itemId: "d", roomId: "r", x: 74, y: 12, rotation: 0 }] }, defaultRules);
+    expect(messages(behind)).toContain("chair pull-out needs 36 in, has 20 in (radiator)");
+  });
+
+  it("puts a walkway narrowed only by a built-in in the room's notes, not on a piece", () => {
+    const report = evaluateRoom(
+      { room: { ...room, openings: [...room.openings, closet], builtIns: [builtIn("k", "counter", 29, 50, 115, 20)] }, items: [item("n", "generic", 18, 18)], placements: [{ id: "p", itemId: "n", roomId: "r", x: 133, y: 109, rotation: 0 }] },
+      defaultRules,
+    );
+    expect(report.verdicts[0].result).toBe("fits");
+    expect(report.walkway.notes.join(" ")).toMatch(/^The counter leaves only 29 in between the entry door and the closet door\.$/);
+  });
+
+  it("still blames a piece that narrows the way past a built-in", () => {
+    // A 20 in counter from the left wall at y 50…70 leaves x 60…144 open; the divider
+    // from the right wall then leaves only 24 in between them.
+    const report = evaluateRoom(
+      {
+        room: { ...room, openings: [...room.openings, closet], builtIns: [builtIn("k", "counter", 0, 50, 60, 20)] },
+        items: [item("d", "generic", 60, 20)],
+        placements: [{ id: "p", itemId: "d", roomId: "r", x: 114, y: 60, rotation: 0 }],
+      },
+      defaultRules,
+    );
+    expect(report.verdicts[0].reasons.map((r) => r.code)).toEqual(["walkway"]);
+  });
+});
+
 describe("suggest (tier 3)", () => {
   const items = [item("desk", "desk", 48, 24)];
   const placements: Placement[] = [{ id: "p", itemId: "desk", roomId: "r", x: 20, y: 12, rotation: 0 }];

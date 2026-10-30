@@ -1,0 +1,5 @@
+{ "name": "Desk pushed into the kitchen counter doesn't fit",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}],
+    "builtIns": [{ "id": "counter", "label": "kitchen counter", "x": 60, "y": 0, "width": 48, "length": 20 }] },
+  "items": [{ "id": "desk", "kind": "desk", "width": 48, "depth": 24, "x": 40, "y": 12, "rotation": 0 }],
+  "expect": { "desk": { "result": "doesnt-fit", "codes": ["built-in"] } } }

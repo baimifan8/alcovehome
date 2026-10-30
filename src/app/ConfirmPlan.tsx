@@ -1,6 +1,6 @@
 // The confirm screen (SPEC.md, "Confirm screen (required)"): the reading drawn over
 // the original picture, every size a typed field, doubtful items highlighted, doors
-// and windows editable, and every wall's source shown.
+// and windows editable, built-ins editable, and every wall's source shown.
 
 import { useState } from "react";
 import type { DraftPlan, DraftRoom } from "../import/draft.ts";
@@ -8,8 +8,8 @@ import type { PlanImage } from "../import/client.ts";
 import type { Opening, Room, WallSource } from "../model/types.ts";
 import type { Units } from "../model/units.ts";
 import { LengthInput } from "./LengthInput.tsx";
-import { OpeningEditor } from "./RoomPanel.tsx";
-import { newOpening, rectRoom, resizeRoom } from "./store.ts";
+import { BuiltInEditor, OpeningEditor } from "./RoomPanel.tsx";
+import { newBuiltIn, newOpening, rectRoom, resizeRoom } from "./store.ts";
 
 interface Props {
   name: string;
@@ -32,8 +32,8 @@ const ADD: { type: Opening["type"]; label: string }[] = [
   { type: "passage", label: "Open doorway" },
 ];
 
-/** A stand-in Room so the door editor can work out wall lengths. */
-const asRoom = (d: DraftRoom): Room => ({ ...rectRoom(d.name, d.width ?? 120, d.length ?? 120, d.key), openings: d.openings });
+/** A stand-in Room so the door and built-in editors can work out wall lengths. */
+const asRoom = (d: DraftRoom): Room => ({ ...rectRoom(d.name, d.width ?? 120, d.length ?? 120, d.key), openings: d.openings, builtIns: d.builtIns });
 
 export function ConfirmPlan({ name, draft, image, units, onConfirm, onBack }: Props) {
   const [rooms, setRooms] = useState(draft.rooms);
@@ -42,7 +42,7 @@ export function ConfirmPlan({ name, draft, image, units, onConfirm, onBack }: Pr
 
   const included = rooms.filter((r) => r.include);
   const missing = included.filter((r) => r.width === null || r.length === null);
-  const toCheck = included.reduce((n, r) => n + (r.issues.length ? 1 : 0) + r.doubtfulOpenings.length, 0);
+  const toCheck = included.reduce((n, r) => n + (r.issues.length ? 1 : 0) + r.doubtfulOpenings.length + r.doubtfulBuiltIns.length, 0);
 
   const select = (key: string) => {
     setSelected(key);
@@ -156,7 +156,7 @@ function DraftRoomCard({
                 units={units}
                 bare="ft"
                 min={12}
-                onChange={(width) => onChange({ width, widthSource: "user-edited", openings: keepDoors(r, width, r.length) })}
+                onChange={(width) => onChange({ width, widthSource: "user-edited", ...keepInPlace(r, width, r.length) })}
               />
               <SourceTag source={r.widthSource} onCheck={() => onChange({ widthSource: "user-edited" })} />
             </div>
@@ -167,7 +167,7 @@ function DraftRoomCard({
                 units={units}
                 bare="ft"
                 min={12}
-                onChange={(length) => onChange({ length, lengthSource: "user-edited", openings: keepDoors(r, r.width, length) })}
+                onChange={(length) => onChange({ length, lengthSource: "user-edited", ...keepInPlace(r, r.width, length) })}
               />
               <SourceTag source={r.lengthSource} onCheck={() => onChange({ lengthSource: "user-edited" })} />
             </div>
@@ -202,6 +202,32 @@ function DraftRoomCard({
                   The highlighted doors look right
                 </button>
               )}
+
+              <h3>Built-ins</h3>
+              <p className="hint">Things furniture can't go on, like a kitchen island, counter, radiator or fireplace.</p>
+              {r.builtIns.map((b) => (
+                <BuiltInEditor
+                  key={b.id}
+                  room={asR}
+                  builtIn={b}
+                  units={units}
+                  doubtful={r.doubtfulBuiltIns.includes(b.id)}
+                  onChange={(nb) =>
+                    onChange({ builtIns: r.builtIns.map((x) => (x.id === nb.id ? nb : x)), doubtfulBuiltIns: r.doubtfulBuiltIns.filter((id) => id !== nb.id) })
+                  }
+                  onDelete={() => onChange({ builtIns: r.builtIns.filter((x) => x.id !== b.id), doubtfulBuiltIns: r.doubtfulBuiltIns.filter((id) => id !== b.id) })}
+                />
+              ))}
+              <div className="row wrap">
+                <button className="secondary" onClick={() => onChange({ builtIns: [...r.builtIns, { ...newBuiltIn(asR), confirmed: false }] })}>
+                  + Built-in
+                </button>
+              </div>
+              {r.doubtfulBuiltIns.length > 0 && (
+                <button className="link" onClick={() => onChange({ doubtfulBuiltIns: [] })}>
+                  The highlighted built-ins look right
+                </button>
+              )}
             </>
           )}
           {r.issues.length > 0 && (
@@ -215,10 +241,11 @@ function DraftRoomCard({
   );
 }
 
-/** Openings after a size change, kept the same distance from the plan's left/top corners. */
-function keepDoors(r: DraftRoom, width: number | null, length: number | null): Opening[] {
-  if (r.width === null || r.length === null || width === null || length === null) return r.openings;
-  return resizeRoom(asRoom(r), width, length).openings;
+/** Openings and built-ins after a size change, kept the same distance from the plan's left/top corners. */
+function keepInPlace(r: DraftRoom, width: number | null, length: number | null): Pick<DraftRoom, "openings" | "builtIns"> {
+  if (r.width === null || r.length === null || width === null || length === null) return { openings: r.openings, builtIns: r.builtIns };
+  const resized = resizeRoom(asRoom(r), width, length);
+  return { openings: resized.openings, builtIns: resized.builtIns ?? [] };
 }
 
 function SourceTag({ source, onCheck }: { source: WallSource; onCheck: () => void }) {
@@ -283,6 +310,18 @@ function Overlay({
                     />
                   );
                 })}
+              {r.include &&
+                pxPerInch &&
+                r.builtIns.map((b) => (
+                  <rect
+                    key={b.id}
+                    x={r.bboxPx!.x + b.x * pxPerInch}
+                    y={r.bboxPx!.y + b.y * pxPerInch}
+                    width={b.width * pxPerInch}
+                    height={b.length * pxPerInch}
+                    className={`draft-built-in${r.doubtfulBuiltIns.includes(b.id) ? " doubtful" : ""}`}
+                  />
+                ))}
             </g>
           );
         })}

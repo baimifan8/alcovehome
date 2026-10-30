@@ -43,6 +43,31 @@ describe("draftFromReading", () => {
     expect(room("Closet").openings[0]).toMatchObject({ type: "closet_door", operation: "sliding", wall: 0, offset: 4, width: 40 });
   });
 
+  it("places built-ins in room inches, unconfirmed, and marks doubtful ones", () => {
+    // Living room starts at px (30, 30), labeled scale 2.5 px/in: the fireplace is
+    // flush with the right wall, 48 in from the top.
+    expect(room("Living Room").builtIns).toEqual([
+      expect.objectContaining({ label: "fireplace", x: 162, y: 48, width: 24, length: 48, confirmed: false }),
+    ]);
+    expect(room("Living Room").doubtfulBuiltIns).toEqual([]);
+    const [vanity] = room("Bath").builtIns;
+    expect(vanity).toMatchObject({ label: "vanity", confirmed: false });
+    expect(room("Bath").doubtfulBuiltIns).toEqual([vanity.id]);
+  });
+
+  it("clips a built-in to its room and notes ones in no known room", () => {
+    const odd = draftFromReading({
+      ...fixture,
+      built_ins: [
+        { label: "counter", room: "Bedroom", bbox_px: { x: 800, y: 30, w: 100, h: 50 }, confidence: "high" },
+        { label: "stairs", room: "Attic", bbox_px: { x: 0, y: 0, w: 10, h: 10 }, confidence: "high" },
+      ],
+    });
+    const counter = odd.rooms.find((r) => r.name === "Bedroom")!.builtIns[0];
+    expect(counter.x + counter.width).toBe(132);
+    expect(odd.notes.join(" ")).toMatch(/1 built-in\(s\) couldn't be matched/);
+  });
+
   it("marks doubtful openings", () => {
     expect(room("Bath").doubtfulOpenings).toHaveLength(1);
     expect(room("Living Room").doubtfulOpenings).toHaveLength(0);
@@ -60,6 +85,7 @@ describe("draftFromReading", () => {
     expect(r.wallSources).toEqual(["inferred", "inferred", "inferred", "inferred"]);
     expect(r.openings.every((o) => o.confirmed)).toBe(true);
     const living = draftToRoom(room("Living Room"), "l");
+    expect(living.builtIns?.map((b) => [b.label, b.confirmed])).toEqual([["fireplace", true]]);
     const report = evaluateRoom({ room: living, items: [], placements: [] }, defaultRules);
     expect(report.openings.map((o) => o.label)).toEqual(["entry door", "window"]);
   });

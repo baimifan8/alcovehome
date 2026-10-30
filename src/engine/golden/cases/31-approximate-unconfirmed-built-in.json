@@ -1,0 +1,5 @@
+{ "name": "A piece next to a built-in that hasn't been checked is approximate",
+  "room": { "width": 144, "length": 120, "openings": [{"id":"entry","type":"door","wall":"bottom","offset":106,"width":32,"operation":"swing","swing":"in","hinge":"right"}],
+    "builtIns": [{ "id": "fireplace", "label": "fireplace", "x": 120, "y": 40, "width": 24, "length": 40, "confirmed": false }] },
+  "items": [{ "id": "chest", "kind": "generic", "width": 30, "depth": 18, "x": 100, "y": 9, "rotation": 0 }],
+  "expect": { "chest": { "result": "fits", "codes": [], "approximate": true } } }

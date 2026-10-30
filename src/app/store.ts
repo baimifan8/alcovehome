@@ -1,7 +1,7 @@
 // App state, kept on the user's device (SPEC.md: v1 is local-first, no accounts).
 
 import { bboxSize, defaultRules, evaluateRoom, withClearances, type Rules } from "../engine/index.ts";
-import type { InventoryItem, Opening, Placement, Room, Space } from "../model/types.ts";
+import type { BuiltIn, InventoryItem, Opening, Placement, Room, Space } from "../model/types.ts";
 import type { Units } from "../model/units.ts";
 
 export interface Settings {
@@ -100,7 +100,20 @@ export function resizeRoom(room: Room, width: number, length: number): Room {
     const d = Math.max(0, Math.min(fromCorner, len - width_));
     return { ...o, width: width_, offset: o.wall === 0 || o.wall === 1 ? d : len - d - width_ };
   });
-  return { ...next, openings };
+  // Built-ins keep their spot, pulled back inside if the room got smaller.
+  const builtIns = room.builtIns?.map((b) => {
+    const w = Math.min(b.width, width);
+    const l = Math.min(b.length, length);
+    return { ...b, width: w, length: l, x: Math.max(0, Math.min(b.x, width - w)), y: Math.max(0, Math.min(b.y, length - l)) };
+  });
+  return { ...next, openings, ...(builtIns ? { builtIns } : {}) };
+}
+
+export function newBuiltIn(room: Room): BuiltIn {
+  const { width, length } = roomSize(room);
+  const w = Math.min(36, width);
+  const l = Math.min(24, length);
+  return { id: newId(), label: "built-in", x: (width - w) / 2, y: (length - l) / 2, width: w, length: l, confirmed: true };
 }
 
 export function newOpening(type: Opening["type"], room: Room): Opening {

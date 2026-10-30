@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { evaluateRoom, withClearances, defaultRules } from "../index.ts";
-import type { Footprint, InventoryItem, Opening, Placement, Room, WallSource } from "../../model/types.ts";
+import type { BuiltIn, Footprint, InventoryItem, Opening, Placement, Room, WallSource } from "../../model/types.ts";
 
 interface GoldenOpening extends Partial<Omit<Opening, "wall">> {
   id: string;
@@ -19,6 +19,7 @@ interface GoldenCase {
     length?: number;
     outline?: [number, number][];
     openings: GoldenOpening[];
+    builtIns?: (Omit<BuiltIn, "confirmed"> & { confirmed?: boolean })[];
     wallSources?: Partial<Record<"top" | "right" | "bottom" | "left", WallSource>>;
   };
   clearances?: Record<string, number>;
@@ -55,7 +56,8 @@ function buildRoom(c: GoldenCase["room"]): Room {
     ...o,
     wall: typeof o.wall === "number" ? o.wall : WALLS.indexOf(o.wall),
   }));
-  return { id: "room", name: "Room", outline, wallSources, openings };
+  const builtIns: BuiltIn[] = (c.builtIns ?? []).map((b) => ({ confirmed: true, ...b }));
+  return { id: "room", name: "Room", outline, wallSources, openings, builtIns };
 }
 
 const dir = path.join(path.dirname(new URL(import.meta.url).pathname), "cases");

@@ -32,6 +32,7 @@ const space: Space = {
       ],
       wallSources: ["labeled", "labeled", "inferred", "user-edited"],
       openings: [{ id: "d", type: "door", wall: 2, offset: 100, width: 32, operation: "swing", swing: "in", hinge: "right", confirmed: true }],
+      builtIns: [{ id: "k", label: "kitchen island", x: 50, y: 40, width: 48, length: 30, confirmed: true }],
     },
   ],
   placements: [{ id: "p", itemId: "desk", roomId: "r", x: 30.123456789, y: 12.5, rotation: 90 }],

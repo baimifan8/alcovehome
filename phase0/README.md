@@ -59,7 +59,7 @@ For each image, copy `floorplan/truth/TEMPLATE.json` to `floorplan/truth/plan-NN
 
 - the name as printed, plus `aliases` for other names a reader might reasonably use;
 - the printed dimensions in inches, or `null` if the room isn't labeled;
-- the number of doors, windows and (optionally) closet doors.
+- the number of doors, windows and (optionally) closet doors and built-ins (kitchen islands, counter runs, fireplaces, radiators, tubs…).
 
 Label before you look at any extraction output.
 
@@ -73,7 +73,7 @@ npm run p0:floorplan:extract
 npm run p0:floorplan:score
 ```
 
-The scorer matches rooms by name, compares dimensions as an unordered pair (within 2 in or 2%, whichever is larger), and counts **fixes**: the edits a user would make in the confirm screen (missed room, extra room, wrong or missing dimension, each door/window/closet miscounted).
+The scorer matches rooms by name, compares dimensions as an unordered pair (within 2 in or 2%, whichever is larger), and counts **fixes**: the edits a user would make in the confirm screen (missed room, extra room, wrong or missing dimension, each door/window/closet or built-in miscounted).
 
 ### Gate (proposed: agree on these before running)
 
