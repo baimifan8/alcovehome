@@ -780,3 +780,18 @@ fieldset.addon legend input[type="text"] {
 a {
   color: var(--accent);
 }
+
+/* Share links */
+.share-link {
+  width: 100%;
+  margin-bottom: 0.6rem;
+}
+.shared-title {
+  color: var(--muted);
+}
+.shared-title strong {
+  color: var(--text);
+}
+.shared-message {
+  padding: 2rem 1rem;
+}

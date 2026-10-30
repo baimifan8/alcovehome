@@ -17,6 +17,8 @@ interface Props {
   /** `final` is false while dragging and true on release. */
   onMove: (p: Placement, final: boolean) => void;
   onRemove: (id: string) => void;
+  /** View only (a shared plan): pieces can be selected but not moved. */
+  readOnly?: boolean;
 }
 
 const MARGIN = 30;
@@ -28,7 +30,7 @@ type Drag =
 
 const pts = (poly: Point[]) => poly.map((p) => `${p.x},${p.y}`).join(" ");
 
-export function PlanView({ room, items, placements, report, rules, units, selected, onSelect, onMove, onRemove }: Props) {
+export function PlanView({ room, items, placements, report, rules, units, selected, onSelect, onMove, onRemove, readOnly = false }: Props) {
   const svg = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -55,6 +57,7 @@ export function PlanView({ room, items, placements, report, rules, units, select
   const startMove = (e: ReactPointerEvent, p: PlacedItem) => {
     e.stopPropagation();
     onSelect(p.placement.id);
+    if (readOnly) return;
     const at = toPlan(e);
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     setDrag({ kind: "move", id: p.placement.id, grab: { x: at.x - p.placement.x, y: at.y - p.placement.y }, pointerId: e.pointerId });
@@ -89,6 +92,10 @@ export function PlanView({ room, items, placements, report, rules, units, select
 
   const onKey = (e: React.KeyboardEvent) => {
     if (!sel) return;
+    if (readOnly) {
+      if (e.key === "Escape") onSelect(null);
+      return;
+    }
     const step = e.shiftKey ? 6 : 1;
     const p = sel.placement;
     const moves: Record<string, Partial<Placement>> = {
@@ -119,7 +126,7 @@ export function PlanView({ room, items, placements, report, rules, units, select
       className="plan"
       viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
       role="application"
-      aria-label={`Plan of ${room.name}. Select an item, then use arrow keys to move it, R to rotate, Delete to remove.`}
+      aria-label={readOnly ? `Plan of ${room.name}.` : `Plan of ${room.name}. Select an item, then use arrow keys to move it, R to rotate, Delete to remove.`}
       tabIndex={0}
       onKeyDown={onKey}
       onPointerDown={() => onSelect(null)}
@@ -234,7 +241,7 @@ export function PlanView({ room, items, placements, report, rules, units, select
             key={p.placement.id}
             className={`item${isSel ? " selected" : ""}`}
             onPointerDown={(e) => startMove(e, p)}
-            style={{ cursor: drag?.id === p.placement.id ? "grabbing" : "grab" }}
+            style={{ cursor: readOnly ? "pointer" : drag?.id === p.placement.id ? "grabbing" : "grab" }}
           >
             {p.polys.map((poly, i) => (
               <polygon key={i} points={pts(poly)} fill={v ? fill[v.result] : "var(--muted)"} className="item-shape" />
@@ -261,7 +268,7 @@ export function PlanView({ room, items, placements, report, rules, units, select
         </g>
       ))}
 
-      {sel && (
+      {sel && !readOnly && (
         <g className="rotate-handle" onPointerDown={(e) => startRotate(e, sel)}>
           {(() => {
             const back = sel.toWorld({ x: sel.item.width / 2, y: 0 });

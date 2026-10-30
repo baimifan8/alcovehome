@@ -155,6 +155,8 @@ export function findSpot(state: AppState, room: Room, item: InventoryItem): Plac
 
 export type Action =
   | { type: "createSpace"; name: string; rooms: Room[]; sourceImage?: string; id?: string }
+  /** A shared plan saved as the user's own listing, with the furniture it brings. */
+  | { type: "importSpace"; space: Space; items: InventoryItem[] }
   | { type: "updateSpace"; space: Space }
   | { type: "deleteSpace"; id: string }
   | { type: "select"; spaceId: string | null; roomId?: string | null }
@@ -186,6 +188,13 @@ export function reducer(state: AppState, a: Action): AppState {
       };
       return { ...state, spaces: [...state.spaces, space], current: { spaceId: space.id, roomId: a.rooms[0]?.id ?? null } };
     }
+    case "importSpace":
+      return {
+        ...state,
+        spaces: [...state.spaces, a.space],
+        inventory: [...state.inventory, ...a.items],
+        current: { spaceId: a.space.id, roomId: a.space.rooms[0]?.id ?? null },
+      };
     case "updateSpace":
       return { ...state, spaces: state.spaces.map((s) => (s.id === a.space.id ? a.space : s)) };
     case "deleteSpace": {

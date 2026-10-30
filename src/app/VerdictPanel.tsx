@@ -17,9 +17,11 @@ interface Props {
   onSelect: (id: string) => void;
   onMove: (p: Placement) => void;
   onRemove: (id: string) => void;
+  /** View only (a shared plan): no turning, removing or suggestions. */
+  readOnly?: boolean;
 }
 
-export function VerdictPanel({ room, items, placements, report, rules, units, selected, onSelect, onMove, onRemove }: Props) {
+export function VerdictPanel({ room, items, placements, report, rules, units, selected, onSelect, onMove, onRemove, readOnly = false }: Props) {
   const itemById = new Map(items.map((i) => [i.id, i]));
   const placementById = new Map(placements.map((p) => [p.id, p]));
   const counts = { fits: 0, tight: 0, "doesnt-fit": 0 };
@@ -28,7 +30,7 @@ export function VerdictPanel({ room, items, placements, report, rules, units, se
   return (
     <div className="panel-body">
       {report.verdicts.length === 0 ? (
-        <p className="hint">Place furniture from the Furniture tab to get a verdict for each piece.</p>
+        <p className="hint">{readOnly ? "No furniture has been placed in this room." : "Place furniture from the Furniture tab to get a verdict for each piece."}</p>
       ) : (
         <p className="summary" aria-live="polite">
           <span className="badge fits">{counts.fits} fit</span>
@@ -70,7 +72,7 @@ export function VerdictPanel({ room, items, placements, report, rules, units, se
                   ))}
                 </ul>
               )}
-              {isSel && <Selected room={room} items={items} placements={placements} rules={rules} units={units} item={item} placement={p} result={v.result} onMove={onMove} onRemove={onRemove} />}
+              {isSel && !readOnly && <Selected room={room} items={items} placements={placements} rules={rules} units={units} item={item} placement={p} result={v.result} onMove={onMove} onRemove={onRemove} />}
             </li>
           );
         })}
