@@ -15,7 +15,16 @@ See SPEC.md for the product spec and phased plan.
 
 ## API key
 
-The server needs an **Anthropic API key**. Create one in the Claude Console (platform.claude.com) under API keys, add credits under Billing, and consider a monthly spend limit there too. Put the key in the server's environment as `ANTHROPIC_API_KEY`, never in the app or the repository. The default model is `claude-opus-5-5` (`ALCOVE_MODEL` changes it). Expect roughly $0.05–0.20 per floor plan and $0.10–0.40 per store page; the server logs the actual cost of each reading.
+The server needs an **Anthropic API key**. Create one in the Claude Console (platform.claude.com) under API keys, add credits under Billing, and consider a monthly spend limit there too. Put the key in the server's environment as `ANTHROPIC_API_KEY`, never in the app or the repository. Each kind of reading has its own model:
+
+| Reading | Default | Setting | Why |
+| --- | --- | --- | --- |
+| Floor plan pictures | `claude-sonnet-5-5` ($2 / $10 per M tokens) | `ALCOVE_PLAN_MODEL` | A hard visual reading: labels, door swings, pixel positions |
+| Store pages and size screenshots | `claude-haiku-5-5` ($0.10 / $0.50) | `ALCOVE_PRODUCT_MODEL` | Mostly copying one line of sizes with its units; code does the conversion |
+
+`ALCOVE_MODEL` sets both at once (the per-reading settings win over it). `ALCOVE_EFFORT` (default `high`) sets reasoning effort. Requests ask for a server-side fallback (`fallbacks: "default"`, retrying a rare safety decline on another model) only on models that accept it (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5.5); Haiku rejects the parameter, so it's left out there. The server prints both models when it starts.
+
+Expect roughly $0.03–0.10 per floor plan and under $0.01 per store page with the defaults (Opus 5.5 would be about $0.05–0.20 and $0.10–0.40); the server logs the actual cost of each reading. These defaults are an informed guess: Phase 0 compares models on real samples (see [`phase0/README.md`](phase0/README.md)), so settle them there.
 
 ## Run it
 
@@ -99,7 +108,7 @@ listing text ──parseListingText──▶ draftFromText ───────
 - `src/import/labels.ts`: parses labels (`11'2" x 12'0"`, `12'10 x 10'`, `3.4 x 3.6 m`…) and listing text. Pure, tested.
 - `src/import/draft.ts`: scale = median px-per-inch over labeled rooms. A label's longer number goes to the longer drawn side. Unlabeled rooms are measured with the scale and tagged `inferred`. Labels more than 12% off the drawing's scale are flagged. Openings are converted from pixels to wall offsets, and all start unconfirmed.
 - `src/app/ConfirmPlan.tsx`: the reading drawn over the picture at the typed sizes, so a wrong number shows as an outline missing the walls. Every size is a typed field, with highlighted issues and doubtful openings. Per-wall source tags (`labeled` / `inferred` / `user-edited`) and "Looks right" turn an inferred size into `user-edited`. Confirming makes openings `confirmed`.
-- `server/`: `index.ts` (API plus static files), `claude.ts` (shared structured-output call with `fallbacks: "default"`; also used by Phase 0), `imageSize.ts`.
+- `server/`: `index.ts` (API plus static files), `claude.ts` (shared structured-output call, model chosen per reading by `modelFor`; also used by Phase 0), `imageSize.ts`.
 - Pictures are kept in IndexedDB (`Space.sourceImage`), not localStorage.
 - Rooms from listing text set `Room.approximate`, which marks every verdict in them approximate.
 - Images are shrunk to 1568 px on the long side before sending, so the pixel positions Claude reports match the image the overlay draws on.

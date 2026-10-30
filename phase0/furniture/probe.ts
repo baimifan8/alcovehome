@@ -6,14 +6,15 @@
 //   3. have Claude extract assembled dimensions from whatever text came back;
 //   4. if a specs screenshot is listed, extract from that too (the fallback path);
 //   5. compare against the hand-entered truth.
-// Writes out/<retailer>-<n>.json per product and report.md.
+// Writes out/<model>/<retailer>-<n>.json per product and report-<model>.md.
 //
 //   npm run p0:furniture
 //   npm run p0:furniture -- --browser      # needs `npm i -D playwright` + a Chromium
+//   ALCOVE_PRODUCT_MODEL=claude-sonnet-5-5 npm run p0:furniture   # compare a model
 
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { extract, mediaTypeFor, type ExtractionRun } from "../../server/claude.ts";
+import { extract, mediaTypeFor, modelFor, type ExtractionRun } from "../../server/claude.ts";
 import { detectBlock, pageText } from "../../server/pageText.ts";
 import { safeFetch } from "../../server/safeFetch.ts";
 import { draftFromProduct, PRODUCT_SYSTEM, ProductReading } from "../../src/import/product.ts";
@@ -22,6 +23,9 @@ type Product = ProductReading;
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const USE_BROWSER = process.argv.includes("--browser");
+const MODEL = modelFor("product");
+const OUT = path.join(DIR, "out", MODEL);
+const REPORT = path.join(DIR, `report-${MODEL}.md`);
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
@@ -119,7 +123,7 @@ async function safely(label: string, run: () => Promise<ExtractionRun<Product>>)
 }
 
 const readText = (label: string, text: string) =>
-  safely(label, () => extract(ProductReading, PRODUCT_SYSTEM, [{ kind: "text", text }], "Find this product's overall assembled size."));
+  safely(label, () => extract(ProductReading, PRODUCT_SYSTEM, [{ kind: "text", text }], "Find this product's overall assembled size.", "product"));
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const mark = (a: Accuracy | null) => (!a ? "read" : a.dimsCorrect ? "✅" : "❌");
@@ -142,6 +146,8 @@ interface Row {
 async function main() {
   const config: Config = JSON.parse(await readFile(path.join(DIR, "retailers.json"), "utf8"));
   const rows: Row[] = [];
+  await mkdir(OUT, { recursive: true });
+  console.log(`Model: ${MODEL}`);
 
   for (const { retailer, products } of config.retailers) {
     for (const [i, entry] of products.entries()) {
@@ -166,6 +172,7 @@ async function main() {
             PRODUCT_SYSTEM,
             [{ kind: "image", mediaType: shotType, base64 }],
             "Find this product's overall assembled size in this screenshot.",
+            "product",
           ),
         );
       }
@@ -193,7 +200,7 @@ async function main() {
 
       // Drop page text from the saved JSON; it is large and reproducible.
       const save = { ...row, plain: { ...plain, text: undefined }, browser: browserRes && { ...browserRes, text: undefined } };
-      await writeFile(path.join(DIR, "out", `${slug(retailer)}-${i + 1}.json`), JSON.stringify(save, null, 2));
+      await writeFile(path.join(OUT, `${slug(retailer)}-${i + 1}.json`), JSON.stringify(save, null, 2));
     }
   }
   if (browser) await browser.close();
@@ -248,7 +255,7 @@ async function main() {
   const lines = [
     "# Phase 0 · Product-link reading results",
     "",
-    `Generated ${new Date().toISOString()}. ${rows.length} products across ${byRetailer.size} retailers. Headless browser: ${USE_BROWSER ? "on" : "off"}.`,
+    `Generated ${new Date().toISOString()}. ${rows.length} products across ${byRetailer.size} retailers, read by ${MODEL}. Headless browser: ${USE_BROWSER ? "on" : "off"}.`,
     "",
     "## By retailer",
     "",
@@ -280,8 +287,8 @@ async function main() {
     "Note: results depend on the network the probe runs from. Retailers block datacenter IPs more aggressively than home connections, so run it from wherever the v1 server will live as well as from a laptop.",
   ];
 
-  await writeFile(path.join(DIR, "report.md"), lines.join("\n"));
-  console.log(`\nReport: ${path.join(DIR, "report.md")}`);
+  await writeFile(REPORT, lines.join("\n"));
+  console.log(`\nReport: ${REPORT}`);
 }
 
 await main();

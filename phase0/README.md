@@ -4,10 +4,28 @@ Two cheap tests that decide whether Alcove Home's two AI-reading features are re
 
 | Test | Question it answers | Script | Output |
 | --- | --- | --- | --- |
-| Floor plan extraction | Can AI read a listing's floor plan well enough that a user can fix it in a confirm screen? | `floorplan/extract.ts`, `floorplan/score.ts` | `floorplan/report.md` |
-| Product-link reading | Which of the top 10 retailers can a server read dimensions from, and which need the screenshot fallback? | `furniture/probe.ts` | `furniture/report.md` |
+| Floor plan extraction | Can AI read a listing's floor plan well enough that a user can fix it in a confirm screen? | `floorplan/extract.ts`, `floorplan/score.ts` | `floorplan/report-<model>.md` |
+| Product-link reading | Which of the top 10 retailers can a server read dimensions from, and which need the screenshot fallback? | `furniture/probe.ts` | `furniture/report-<model>.md` |
 
-Both use `claude-opus-5-5` with structured outputs, so every result is schema-valid JSON. They also record token cost and latency, which answers the spec's open question about cost per extraction. Requests set `fallbacks: "default"`, so a rare safety decline is retried on a fallback model, not just dropped. To try a cheaper model, set `ALCOVE_MODEL=claude-sonnet-5-5`. `ALCOVE_EFFORT` (default `high`) sets reasoning effort.
+Both use the app's own models and structured outputs, so every result is schema-valid JSON: `claude-sonnet-5-5` for floor plans and `claude-haiku-5-5` for store pages by default. They also record token cost and latency, which answers the spec's open question about cost per extraction. On models that support it, requests set `fallbacks: "default"`, so a rare safety decline is retried on a fallback model, not just dropped. `ALCOVE_EFFORT` (default `high`) sets reasoning effort.
+
+### Comparing models
+
+Each run saves its results under `out/<model>/` and its report as `report-<model>.md`, so runs with different models sit side by side. Override the model per run:
+
+```bash
+ALCOVE_PLAN_MODEL=claude-opus-5-5 npm run p0:floorplan:extract
+```
+
+```bash
+ALCOVE_PLAN_MODEL=claude-opus-5-5 npm run p0:floorplan:score
+```
+
+```bash
+ALCOVE_PRODUCT_MODEL=claude-sonnet-5-5 npm run p0:furniture
+```
+
+Pick, for each reading, the cheapest model that passes the gate, and set it as the default in `server/claude.ts` (`DEFAULT_MODEL`).
 
 ## Setup
 
@@ -121,8 +139,10 @@ That decides how prominent the screenshot fallback needs to be in Phase 3. Phase
 
 These are estimates. The reports show actual costs.
 
-- **Floor plans:** about $0.05–0.20 per plan at Opus 5.5 pricing ($4 / $20 per M tokens), so about $1–4 for 20 plans.
-- **Product pages:** page text is larger, roughly $0.10–0.40 per page, so about $5–15 for 30 products.
+- **Floor plans:** about $0.03–0.10 per plan on Sonnet 5.5 ($2 / $10 per M tokens), so about $0.50–2 for 20 plans. Opus 5.5 ($4 / $20) is about double; Haiku 5.5 ($0.10 / $0.50) is about 1/20 of Sonnet.
+- **Product pages:** page text is larger. Under $0.01 per page on Haiku 5.5, so well under $1 for 30 products. Sonnet 5.5 would be about $0.05–0.20 per page and Opus 5.5 about $0.10–0.40.
+
+Trying all three models on both tests costs up to about $25 in total.
 
 ## Status
 

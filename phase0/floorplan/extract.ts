@@ -1,20 +1,22 @@
 // Phase 0 · floor plan extraction.
 // Reads every image in phase0/floorplan/images/ with exactly the prompt and format
 // the app uses (src/import/reading.ts) and writes one JSON per image to
-// phase0/floorplan/out/, including token usage, cost and latency.
+// phase0/floorplan/out/<model>/, including token usage, cost and latency, so runs
+// with different models sit side by side.
 //
-//   npm run p0:floorplan:extract            # all images
+//   npm run p0:floorplan:extract            # all images, the app's floor plan model
 //   npm run p0:floorplan:extract -- a.png   # just these
+//   ALCOVE_PLAN_MODEL=claude-opus-5-5 npm run p0:floorplan:extract   # compare a model
 
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { extract, mediaTypeFor } from "../../server/claude.ts";
+import { extract, mediaTypeFor, modelFor } from "../../server/claude.ts";
 import { imageSize } from "../../server/imageSize.ts";
 import { PlanReading, READING_SYSTEM, readingInstruction } from "../../src/import/reading.ts";
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const IMAGES = path.join(DIR, "images");
-const OUT = path.join(DIR, "out");
+const OUT = path.join(DIR, "out", modelFor("plan"));
 
 async function main() {
   const requested = process.argv.slice(2);
@@ -25,6 +27,8 @@ async function main() {
     console.error(`No images in ${IMAGES}. Add listing screenshots (png/jpg/webp) and re-run.`);
     process.exit(1);
   }
+  await mkdir(OUT, { recursive: true });
+  console.log(`Model: ${modelFor("plan")}`);
 
   for (const file of files) {
     const mediaType = mediaTypeFor(file);
@@ -45,6 +49,7 @@ async function main() {
         READING_SYSTEM,
         [{ kind: "image", mediaType, base64: bytes.toString("base64") }],
         readingInstruction(size.width, size.height),
+        "plan",
       );
       await writeFile(path.join(OUT, `${path.parse(file).name}.json`), JSON.stringify({ image: file, ...run }, null, 2));
       console.log(

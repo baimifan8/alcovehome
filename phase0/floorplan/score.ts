@@ -1,6 +1,7 @@
 // Phase 0 · score floor plan extraction against hand-labeled truth.
-// Compares phase0/floorplan/out/<name>.json with phase0/floorplan/truth/<name>.json
-// and writes phase0/floorplan/report.md.
+// Compares phase0/floorplan/out/<model>/<name>.json with phase0/floorplan/truth/<name>.json
+// and writes phase0/floorplan/report-<model>.md. The model is the one extract used
+// (ALCOVE_PLAN_MODEL, else ALCOVE_MODEL, else the app's default).
 //
 // The gate question is "is extraction good enough to fix in a confirm screen?",
 // so the headline number is "fixes": how many edits a user would make to get
@@ -10,10 +11,13 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { draftFromReading, type DraftPlan } from "../../src/import/draft.ts";
+import { modelFor } from "../../server/claude.ts";
 import { PlanReading } from "../../src/import/reading.ts";
 import { Truth } from "./schema.ts";
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
+const MODEL = modelFor("plan");
+const REPORT = path.join(DIR, `report-${MODEL}.md`);
 
 // Proposed gate thresholds. Tune before the run, not after.
 export const GATE = {
@@ -136,7 +140,7 @@ async function main() {
     const truth = Truth.parse(JSON.parse(await readFile(path.join(DIR, "truth", f), "utf8")));
     let raw: { output: unknown; stopReason: string | null; costUsd: number | null; latencyMs: number };
     try {
-      raw = JSON.parse(await readFile(path.join(DIR, "out", f), "utf8"));
+      raw = JSON.parse(await readFile(path.join(DIR, "out", MODEL, f), "utf8"));
     } catch {
       failures.push(`${f}: no extraction output (run extract first)`);
       continue;
@@ -150,7 +154,7 @@ async function main() {
   }
 
   if (!scores.length) {
-    console.error("Nothing to score. Need matching files in truth/ and out/.");
+    console.error(`Nothing to score. Need matching files in truth/ and out/${MODEL}/.`);
     for (const f of failures) console.error(`  ${f}`);
     process.exit(1);
   }
@@ -175,7 +179,7 @@ async function main() {
   const lines = [
     "# Phase 0 · Floor plan extraction results",
     "",
-    `Generated ${new Date().toISOString()} from ${plans} plans.`,
+    `Generated ${new Date().toISOString()} from ${plans} plans read by ${MODEL}.`,
     "",
     `## Gate: ${pass ? "PASS" : "FAIL"}`,
     "",
@@ -210,9 +214,9 @@ async function main() {
   ];
 
   const report = lines.join("\n");
-  await writeFile(path.join(DIR, "report.md"), report);
+  await writeFile(REPORT, report);
   console.log(report.split("## Supporting numbers")[0]);
-  console.log(`Full report: ${path.join(DIR, "report.md")}`);
+  console.log(`Full report: ${REPORT}`);
 }
 
 await main();

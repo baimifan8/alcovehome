@@ -16,7 +16,7 @@ import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { draftFromProduct, normalizeProductUrl, PRODUCT_SYSTEM, ProductReading, SavedProduct } from "../src/import/product.ts";
 import { PlanReading, READING_SYSTEM, readingInstruction } from "../src/import/reading.ts";
-import { extract, hasApiKey, type ImageMediaType } from "./claude.ts";
+import { extract, hasApiKey, modelFor, type ImageMediaType } from "./claude.ts";
 import { imageSize } from "./imageSize.ts";
 import { detectBlock, pageText } from "./pageText.ts";
 import { clientAddress, limits, loadSalt, personKey, type RateLimit } from "./limits.ts";
@@ -89,6 +89,7 @@ async function floorplan(req: IncomingMessage, res: ServerResponse) {
       READING_SYSTEM,
       [{ kind: "image", mediaType, base64: body.imageBase64 }],
       readingInstruction(size.width, size.height),
+      "plan",
     );
     if (!run.output) {
       return send(res, 422, { error: "Couldn't read that floor plan. Try a clearer screenshot, or type the sizes." });
@@ -148,7 +149,7 @@ async function product(req: IncomingMessage, res: ServerResponse) {
   try {
     const { text, trimmed } = pageText(html);
     if (trimmed) console.log(`product page ${url}: long page cut to the passages mentioning sizes`);
-    const run = await extract(ProductReading, PRODUCT_SYSTEM, [{ kind: "text", text }], "Find this product's overall assembled size.");
+    const run = await extract(ProductReading, PRODUCT_SYSTEM, [{ kind: "text", text }], "Find this product's overall assembled size.", "product");
     if (!run.output?.found) {
       return send(res, 422, { error: `Couldn't find the size on that page. ${SCREENSHOT_HINT}`, needScreenshot: true, url });
     }
@@ -183,6 +184,7 @@ async function productScreenshot(req: IncomingMessage, res: ServerResponse) {
       PRODUCT_SYSTEM,
       [{ kind: "image", mediaType, base64: body.imageBase64 }],
       "Find this product's overall assembled size in this screenshot.",
+      "product",
     );
     if (!run.output?.found) return send(res, 422, { error: "Couldn't find a size in that screenshot. Make sure the size details are in view, or type them." });
     send(res, 200, { reading: run.output });
@@ -263,5 +265,11 @@ createServer((req, res) => {
   if (req.method === "GET") return void serveStatic(req, res);
   send(res, 405, { error: "Method not allowed" });
 }).listen(PORT, () => {
-  console.log(`Alcove Home server on http://localhost:${PORT}${hasApiKey() ? "" : " (no ANTHROPIC_API_KEY: reading plans and store pages is off; saved products still work)"}`);
+  console.log(
+    `Alcove Home server on http://localhost:${PORT}${
+      hasApiKey()
+        ? ` (floor plans: ${modelFor("plan")}, store pages: ${modelFor("product")})`
+        : " (no ANTHROPIC_API_KEY: reading plans and store pages is off; saved products still work)"
+    }`,
+  );
 });
