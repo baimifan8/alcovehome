@@ -91,6 +91,46 @@ describe("draftFromReading", () => {
   });
 });
 
+describe("L-shaped rooms", () => {
+  // The living room read as an L: its top-right 100 x 150 px (40 x 60 in) is missing,
+  // with a door on the inside corner's top-to-bottom wall.
+  const reading = {
+    ...fixture,
+    rooms: fixture.rooms.map((r) => (r.name === "Living Room" ? { ...r, notch_px: { corner: "top_right" as const, w: 100, h: 150 } } : r)),
+    openings: [
+      ...fixture.openings.filter((o) => o.room !== "Living Room"),
+      { type: "window" as const, room: "Living Room", wall: "top" as const, start_px: 50, end_px: 170, swing: "none" as const, hinge_at: "unknown" as const, confidence: "high" as const },
+      { type: "door" as const, room: "Living Room", wall: "inner_down" as const, start_px: 60, end_px: 135, swing: "into_room" as const, hinge_at: "start" as const, confidence: "high" as const },
+    ],
+  };
+  const plan = draftFromReading(reading);
+  const living = plan.rooms.find((r) => r.name === "Living Room")!;
+
+  it("keeps the overall size, measures the cut-out and asks for a check", () => {
+    // An L's label may give only one arm, so the scale comes from the rectangles alone.
+    const withoutLiving = draftFromReading({ ...fixture, rooms: fixture.rooms.filter((r) => r.name !== "Living Room") });
+    expect(plan.pxPerInch).toBe(withoutLiving.pxPerInch);
+    expect(living).toMatchObject({ width: 186, length: 144, notch: { corner: "top-right", width: 40, length: 60 }, notchSource: "inferred" });
+    expect(living.issues.join(" ")).toMatch(/L-shaped/);
+  });
+
+  it("puts doors on the inside corner's walls", () => {
+    const [door, window] = living.openings;
+    // Walls of a top-right L: top, inner top-to-bottom, inner left-to-right, right, bottom, left.
+    expect(door).toMatchObject({ type: "door", wall: 1, offset: 12, width: 30, hinge: "left" });
+    expect(window).toMatchObject({ type: "window", wall: 0, offset: 8, width: 48 });
+  });
+
+  it("becomes a room the fit engine treats as an L, with the cut-out's walls tagged inferred", () => {
+    const room = draftToRoom(living, "l");
+    expect(room.outline).toHaveLength(6);
+    expect(room.wallSources).toEqual(["labeled", "inferred", "inferred", "labeled", "labeled", "labeled"]);
+    const box = { id: "b", nickname: "Box", kind: "generic", source: { type: "manual" as const }, width: 10, depth: 10, height: 10, footprint: { shape: "rect" as const }, addOns: [] };
+    const report = evaluateRoom({ room, items: [box], placements: [{ id: "p", itemId: "b", roomId: "l", x: 170, y: 20, rotation: 0 }] }, defaultRules);
+    expect(report.verdicts[0].reasons.map((r) => r.code)).toEqual(["outside-room"]);
+  });
+});
+
 describe("draftFromText", () => {
   it("makes approximate rectangles with no doors", () => {
     const plan = draftFromText(parseListingText("Bedroom 2: 11' x 12'"));

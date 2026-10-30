@@ -1,11 +1,12 @@
 import { useState, type Dispatch } from "react";
 import { loadImage, type PlanImage } from "../import/client.ts";
+import { walls } from "../engine/index.ts";
+import { CORNER_LABEL, CORNERS, clampShape, openingFromEdge, placeOnWall, reshapeRoom, ROLE_LABEL, shapeOf, wallRoles, wallRunsForward, type RoomShape } from "../model/shape.ts";
 import type { BuiltIn, Opening, Room, Space } from "../model/types.ts";
 import type { Units } from "../model/units.ts";
 import { LengthInput } from "./LengthInput.tsx";
 import { newBuiltIn, newOpening, rectRoom, resizeRoom, roomSize, type Action } from "./store.ts";
 
-const WALLS = ["Top", "Right", "Bottom", "Left"];
 const TYPES: { type: Opening["type"]; label: string }[] = [
   { type: "door", label: "Door" },
   { type: "closet_door", label: "Closet door" },
@@ -74,6 +75,7 @@ function OriginalPlan({ imageKey }: { imageKey: string }) {
 
 function RoomEditor({ room, units, dispatch, canDelete }: { room: Room; units: Units; dispatch: Dispatch<Action>; canDelete: boolean }) {
   const size = roomSize(room);
+  const shape = shapeOf(room);
   const update = (r: Room) => dispatch({ type: "updateRoom", room: r });
   const setOpening = (o: Opening) => update({ ...room, openings: room.openings.map((x) => (x.id === o.id ? o : x)) });
   const builtIns = room.builtIns ?? [];
@@ -89,6 +91,7 @@ function RoomEditor({ room, units, dispatch, canDelete }: { room: Room; units: U
         <LengthInput label="Width (left to right)" value={size.width} units={units} bare="ft" min={24} onChange={(w) => update(resizeRoom(room, w, size.length))} />
         <LengthInput label="Length (top to bottom)" value={size.length} units={units} bare="ft" min={24} onChange={(l) => update(resizeRoom(room, size.width, l))} />
       </div>
+      {shape && <ShapeFields shape={shape} units={units} onChange={(next) => update(reshapeRoom(room, next))} />}
 
       {room.approximate && (
         <p className="note">This room's size came from listing text, so its shape and doors are guesses. Add the doors you know about.</p>
@@ -164,19 +167,22 @@ export interface OpeningProps {
  * vertex; hinge as seen from inside the room).
  */
 export function OpeningEditor({ room, opening: o, units, onChange, onDelete, onMakeEntry, doubtful }: OpeningProps) {
-  const size = roomSize(room);
-  const horizontal = o.wall % 2 === 0;
-  const wallLen = horizontal ? size.width : size.length;
-  const startsAtPlanCorner = o.wall === 0 || o.wall === 1;
-  const fromCorner = startsAtPlanCorner ? o.offset : wallLen - o.offset - o.width;
+  const ws = walls(room);
+  const roles = wallRoles(room);
+  const w = ws[o.wall];
+  const horizontal = Math.abs(w.dir.y) < 0.5;
+  const wallLen = w.length;
+  const forward = wallRunsForward(room.outline, o.wall);
+  const fromCorner = forward ? o.offset : wallLen - o.offset - o.width;
   const toOffset = (d: number, width: number) => {
     const clamped = Math.max(0, Math.min(d, wallLen - width));
-    return startsAtPlanCorner ? clamped : wallLen - clamped - width;
+    return forward ? clamped : wallLen - clamped - width;
   };
-  const planHinge = (o.hinge === "left") === startsAtPlanCorner ? "first" : "second";
+  const planHinge = (o.hinge === "left") === forward ? "first" : "second";
   const isDoor = o.type === "door" || o.type === "closet_door";
   const canBeEntry = o.type === "door" || o.type === "passage";
   const entryId = room.openings.find((x) => x.entry && (x.type === "door" || x.type === "passage"))?.id ?? room.openings.find((x) => x.type === "door" || x.type === "passage")?.id;
+  const wallName = (i: number) => (roles ? ROLE_LABEL[roles[i]] : ws[i].name.replace(/^./, (c) => c.toUpperCase()));
 
   return (
     <fieldset className={doubtful ? "opening doubtful" : "opening"}>
@@ -202,16 +208,11 @@ export function OpeningEditor({ room, opening: o, units, onChange, onDelete, onM
           <span>Wall</span>
           <select
             value={o.wall}
-            onChange={(e) => {
-              const wall = Number(e.target.value);
-              const len = wall % 2 === 0 ? size.width : size.length;
-              const width = Math.min(o.width, len);
-              onChange({ ...o, wall, width, offset: Math.max(0, Math.min(o.offset, len - width)) });
-            }}
+            onChange={(e) => onChange({ ...o, ...placeOnWall(room.outline, Number(e.target.value), openingFromEdge(room, o), o.width) })}
           >
-            {WALLS.map((w, i) => (
-              <option key={w} value={i}>
-                {w}
+            {ws.map((x) => (
+              <option key={x.index} value={x.index}>
+                {wallName(x.index)}
               </option>
             ))}
           </select>
@@ -260,7 +261,7 @@ export function OpeningEditor({ room, opening: o, units, onChange, onDelete, onM
                   value={planHinge}
                   onChange={(e) => {
                     const first = e.target.value === "first";
-                    onChange({ ...o, hinge: first === startsAtPlanCorner ? "left" : "right" });
+                    onChange({ ...o, hinge: first === forward ? "left" : "right" });
                   }}
                 >
                   <option value="first">{horizontal ? "Left" : "Top"}</option>
@@ -316,6 +317,52 @@ export function BuiltInEditor({ room, builtIn: b, units, onChange, onDelete, dou
         <LengthInput label="Width (left to right)" value={b.width} units={units} bare="in" min={1} onChange={(width) => set({ width })} />
         <LengthInput label="Length (top to bottom)" value={b.length} units={units} bare="in" min={1} onChange={(length) => set({ length })} />
       </div>
+    </fieldset>
+  );
+}
+
+/** Rectangle or L: an L is the rectangle with one corner cut out. */
+export function ShapeFields({ shape, units, onChange }: { shape: RoomShape; units: Units; onChange: (s: RoomShape) => void }) {
+  const set = (next: RoomShape) => onChange(clampShape(next));
+  const notch = shape.notch;
+  return (
+    <fieldset className="shape">
+      <legend>Shape</legend>
+      <div className="row wrap">
+        <label className="field">
+          <span>Room shape</span>
+          <select
+            value={notch ? "l" : "rect"}
+            onChange={(e) =>
+              set({ ...shape, notch: e.target.value === "l" ? { corner: "top-right", width: Math.round(shape.width / 3), length: Math.round(shape.length / 3) } : null })
+            }
+          >
+            <option value="rect">Rectangle</option>
+            <option value="l">L-shaped</option>
+          </select>
+        </label>
+        {notch && (
+          <label className="field">
+            <span>Missing corner</span>
+            <select value={notch.corner} onChange={(e) => set({ ...shape, notch: { ...notch, corner: e.target.value as typeof notch.corner } })}>
+              {CORNERS.map((c) => (
+                <option key={c} value={c}>
+                  {CORNER_LABEL[c]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      {notch && (
+        <>
+          <p className="hint">The width and length above are the room's overall size. Give the size of the corner that isn't part of the room.</p>
+          <div className="row">
+            <LengthInput label="Missing corner width" value={notch.width} units={units} bare="ft" min={12} onChange={(width) => set({ ...shape, notch: { ...notch, width } })} />
+            <LengthInput label="Missing corner length" value={notch.length} units={units} bare="ft" min={12} onChange={(length) => set({ ...shape, notch: { ...notch, length } })} />
+          </div>
+        </>
+      )}
     </fieldset>
   );
 }

@@ -3,13 +3,15 @@
 // and windows editable, built-ins editable, and every wall's source shown.
 
 import { useState } from "react";
-import type { DraftPlan, DraftRoom } from "../import/draft.ts";
+import { draftRoomOutline, type DraftPlan, type DraftRoom } from "../import/draft.ts";
+import { walls } from "../engine/index.ts";
+import { clampShape, reshapeRoom, type RoomShape } from "../model/shape.ts";
 import type { PlanImage } from "../import/client.ts";
 import type { Opening, Room, WallSource } from "../model/types.ts";
 import type { Units } from "../model/units.ts";
 import { LengthInput } from "./LengthInput.tsx";
-import { BuiltInEditor, OpeningEditor } from "./RoomPanel.tsx";
-import { newBuiltIn, newOpening, rectRoom, resizeRoom } from "./store.ts";
+import { BuiltInEditor, OpeningEditor, ShapeFields } from "./RoomPanel.tsx";
+import { newBuiltIn, newOpening } from "./store.ts";
 
 interface Props {
   name: string;
@@ -32,8 +34,11 @@ const ADD: { type: Opening["type"]; label: string }[] = [
   { type: "passage", label: "Open doorway" },
 ];
 
-/** A stand-in Room so the door and built-in editors can work out wall lengths. */
-const asRoom = (d: DraftRoom): Room => ({ ...rectRoom(d.name, d.width ?? 120, d.length ?? 120, d.key), openings: d.openings, builtIns: d.builtIns });
+/** A stand-in Room so the door and built-in editors can work out walls and their lengths. */
+const asRoom = (d: DraftRoom): Room => {
+  const { outline } = draftRoomOutline(d);
+  return { id: d.key, name: d.name, outline, wallSources: outline.map(() => "user-edited"), openings: d.openings, builtIns: d.builtIns };
+};
 
 export function ConfirmPlan({ name, draft, image, units, onConfirm, onBack }: Props) {
   const [rooms, setRooms] = useState(draft.rooms);
@@ -156,7 +161,7 @@ function DraftRoomCard({
                 units={units}
                 bare="ft"
                 min={12}
-                onChange={(width) => onChange({ width, widthSource: "user-edited", ...keepInPlace(r, width, r.length) })}
+                onChange={(width) => onChange({ widthSource: "user-edited", ...keepInPlace(r, { width, length: r.length, notch: r.notch }) })}
               />
               <SourceTag source={r.widthSource} onCheck={() => onChange({ widthSource: "user-edited" })} />
             </div>
@@ -167,7 +172,7 @@ function DraftRoomCard({
                 units={units}
                 bare="ft"
                 min={12}
-                onChange={(length) => onChange({ length, lengthSource: "user-edited", ...keepInPlace(r, r.width, length) })}
+                onChange={(length) => onChange({ lengthSource: "user-edited", ...keepInPlace(r, { width: r.width, length, notch: r.notch }) })}
               />
               <SourceTag source={r.lengthSource} onCheck={() => onChange({ lengthSource: "user-edited" })} />
             </div>
@@ -175,6 +180,11 @@ function DraftRoomCard({
 
           {hasSize && (
             <>
+              <ShapeFields
+                shape={{ width: r.width!, length: r.length!, notch: r.notch }}
+                units={units}
+                onChange={(shape) => onChange({ notchSource: "user-edited", ...keepInPlace(r, shape) })}
+              />
               <h3>Doors and windows</h3>
               {r.openings.length === 0 && <p className="hint">None found. Add the door into this room so walkways can be checked.</p>}
               {r.openings.map((o, i) => (
@@ -241,11 +251,16 @@ function DraftRoomCard({
   );
 }
 
-/** Openings and built-ins after a size change, kept the same distance from the plan's left/top corners. */
-function keepInPlace(r: DraftRoom, width: number | null, length: number | null): Pick<DraftRoom, "openings" | "builtIns"> {
-  if (r.width === null || r.length === null || width === null || length === null) return { openings: r.openings, builtIns: r.builtIns };
-  const resized = resizeRoom(asRoom(r), width, length);
-  return { openings: resized.openings, builtIns: resized.builtIns ?? [] };
+/** A new size or shape, with openings and built-ins kept the same distance from the plan's left/top edges. */
+function keepInPlace(
+  r: DraftRoom,
+  next: { width: number | null; length: number | null; notch: RoomShape["notch"] },
+): Pick<DraftRoom, "width" | "length" | "notch" | "openings" | "builtIns"> {
+  if (r.width === null || r.length === null || next.width === null || next.length === null) return { ...next, openings: r.openings, builtIns: r.builtIns };
+  // The same clamping reshapeRoom applies, so the cut-out matches the new outline.
+  const shape = clampShape({ width: next.width, length: next.length, notch: next.notch });
+  const resized = reshapeRoom(asRoom(r), shape);
+  return { ...shape, openings: resized.openings, builtIns: resized.builtIns ?? [] };
 }
 
 function SourceTag({ source, onCheck }: { source: WallSource; onCheck: () => void }) {
@@ -295,7 +310,11 @@ function Overlay({
           ].join(" ");
           return (
             <g key={r.key} className={cls} onClick={() => onSelect(r.key)}>
-              <rect x={r.bboxPx.x} y={r.bboxPx.y} width={w} height={h} />
+              {pxPerInch && r.width !== null && r.length !== null ? (
+                <polygon points={asRoom(r).outline.map((p) => `${r.bboxPx!.x + p.x * pxPerInch},${r.bboxPx!.y + p.y * pxPerInch}`).join(" ")} />
+              ) : (
+                <rect x={r.bboxPx.x} y={r.bboxPx.y} width={w} height={h} />
+              )}
               {r.include &&
                 pxPerInch &&
                 r.width !== null &&
@@ -333,20 +352,8 @@ function Overlay({
 /** Where an opening sits on the picture, for the overlay. */
 function openingPx(r: DraftRoom, o: Opening, ppi: number) {
   const box = r.bboxPx!;
-  const w = r.width! * ppi;
-  const h = r.length! * ppi;
-  const wallLen = o.wall % 2 === 0 ? r.width! : r.length!;
-  const fromCorner = o.wall === 0 || o.wall === 1 ? o.offset : wallLen - o.offset - o.width;
-  const a = fromCorner * ppi;
-  const b = (fromCorner + o.width) * ppi;
-  switch (o.wall) {
-    case 0:
-      return { x1: box.x + a, y1: box.y, x2: box.x + b, y2: box.y };
-    case 2:
-      return { x1: box.x + a, y1: box.y + h, x2: box.x + b, y2: box.y + h };
-    case 1:
-      return { x1: box.x + w, y1: box.y + a, x2: box.x + w, y2: box.y + b };
-    default:
-      return { x1: box.x, y1: box.y + a, x2: box.x, y2: box.y + b };
-  }
+  const w = walls(asRoom(r))[o.wall];
+  const at = (d: number) => ({ x: box.x + (w.a.x + w.dir.x * d) * ppi, y: box.y + (w.a.y + w.dir.y * d) * ppi });
+  const [a, b] = [at(o.offset), at(o.offset + o.width)];
+  return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
 }

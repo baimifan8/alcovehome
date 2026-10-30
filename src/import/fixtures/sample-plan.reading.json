@@ -1,10 +1,10 @@
 {
   "units_seen": "ft_in",
   "rooms": [
-    { "name": "Living Room", "label_text": "15'6\" x 12'0\"", "bbox_px": { "x": 30, "y": 30, "w": 465, "h": 360 }, "confidence": "high" },
-    { "name": "Bedroom", "label_text": "11'0\" x 10'0\"", "bbox_px": { "x": 505, "y": 30, "w": 330, "h": 300 }, "confidence": "high" },
-    { "name": "Closet", "label_text": null, "bbox_px": { "x": 505, "y": 340, "w": 120, "h": 50 }, "confidence": "medium" },
-    { "name": "Bath", "label_text": "5'0\" x 8'0\"", "bbox_px": { "x": 640, "y": 340, "w": 195, "h": 140 }, "confidence": "high" }
+    { "name": "Living Room", "label_text": "15'6\" x 12'0\"", "bbox_px": { "x": 30, "y": 30, "w": 465, "h": 360 }, "notch_px": null, "confidence": "high" },
+    { "name": "Bedroom", "label_text": "11'0\" x 10'0\"", "bbox_px": { "x": 505, "y": 30, "w": 330, "h": 300 }, "notch_px": null, "confidence": "high" },
+    { "name": "Closet", "label_text": null, "bbox_px": { "x": 505, "y": 340, "w": 120, "h": 50 }, "notch_px": null, "confidence": "medium" },
+    { "name": "Bath", "label_text": "5'0\" x 8'0\"", "bbox_px": { "x": 640, "y": 340, "w": 195, "h": 140 }, "notch_px": null, "confidence": "high" }
   ],
   "openings": [
     { "type": "window", "room": "Living Room", "wall": "top", "start_px": 200, "end_px": 320, "swing": "none", "hinge_at": "unknown", "confidence": "high" },
