@@ -21,6 +21,14 @@
     <line x1="515" y1="332" x2="570" y2="332"/><line x1="560" y1="338" x2="615" y2="338"/>
     <path d="M650 340 L650 415 A75 75 0 0 0 725 340"/>
   </g>
+  <!-- built-ins -->
+  <g fill="#ddd" stroke="#555" stroke-width="1.5">
+    <rect x="435" y="150" width="60" height="120"/>
+    <rect x="775" y="400" width="60" height="80"/>
+  </g>
+  <g font-size="10" fill="#444" text-anchor="middle">
+    <text x="465" y="214">FP</text><text x="805" y="444">VAN</text>
+  </g>
   <g font-size="16" fill="#222" text-anchor="middle">
     <text x="262" y="200">LIVING ROOM</text><text x="262" y="222" font-size="14">15'6" x 12'0"</text>
     <text x="670" y="170">BEDROOM</text><text x="670" y="192" font-size="14">11'0" x 10'0"</text>

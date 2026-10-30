@@ -1,10 +1,11 @@
 // The fit engine: layout + items in, verdicts out. Pure; reads all clearances and use
 // zones from the rules it is given (SPEC.md, "Fit engine rules").
 
-import type { InventoryItem, Placement, Point, Reason, Result, Room, Verdict } from "../model/types.ts";
+import type { BuiltIn, InventoryItem, Placement, Point, Reason, Result, Room, Verdict } from "../model/types.ts";
 import {
   containment,
   distPointPolygonBoundary,
+  distPolyPoly,
   distPolySegment,
   overlapDepth,
   pointInOrOn,
@@ -74,6 +75,7 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
     .filter((p) => itemById.has(p.itemId))
     .map((p) => placeItem(p, itemById.get(p.itemId)!, rules));
   const openings = room.openings.map((o) => openingShape(room, o, rules));
+  const builtIns = builtInShapes(room);
   const reasons = new Map<string, Reason[]>(placed.map((p) => [p.placement.id, []]));
   const add = (id: string, r: Reason) => reasons.get(id)!.push(r);
 
@@ -100,6 +102,13 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
       }
     }
 
+    for (const b of builtIns) {
+      const depth = maxOverlap(p.polys, b.polys);
+      if (depth > 0) {
+        add(p.placement.id, { tier: 0, code: "built-in", message: `overlaps the ${b.name} by ${fmt(depth)}`, related: [b.id] });
+      }
+    }
+
     for (const o of openings) {
       if (!o.keepClear.length) continue;
       if (maxOverlap(p.polys, o.keepClear) > 0) {
@@ -116,10 +125,10 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
     }
   }
 
-  // Tier 1: use zones must be clear of walls and other items.
+  // Tier 1: use zones must be clear of walls, built-ins and other items.
   const zones: ZoneStatus[] = [];
   for (const p of placed) {
-    const others = placed.filter((q) => q !== p);
+    const others: Obstacle[] = [...placed.filter((q) => q !== p), ...builtIns];
     for (const zone of p.zones) {
       const available: Record<string, number> = {};
       const blockers = new Set<string>();
@@ -165,19 +174,30 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
         targets.push({ id: `${z.placementId}:${z.zone.rule.label}`, label: `${p.name}'s ${z.zone.rule.label}`, shape: { kind: "polys", polys } });
       }
     }
+    // Built-ins are in the way like walls: never blamed, since they can't be moved.
+    const fixed = new Map(builtIns.map((b) => [b.id, b.name]));
+    const builtInBlame = new Map<string, string[]>();
     results = checkWalkways(
       outline,
-      placed.map((p) => ({ id: p.placement.id, polys: p.polys })),
+      [...placed.map((p) => ({ id: p.placement.id, polys: p.polys })), ...builtIns],
       { a: entryShape.p0, b: entryShape.p1 },
       targets,
       required,
-    );
+    ).map((r) => {
+      const names = r.narrowedBy.filter((id) => fixed.has(id)).map((id) => fixed.get(id)!);
+      if (names.length) builtInBlame.set(r.targetId, names);
+      return { ...r, narrowedBy: r.narrowedBy.filter((id) => !fixed.has(id)) };
+    });
     // One walkway reason per item, naming every destination it narrows the way to.
     const blamed = new Map<string, WalkwayResult[]>();
     for (const r of results) {
       if (r.ok) continue;
       for (const id of r.narrowedBy) blamed.set(id, [...(blamed.get(id) ?? []), r]);
-      if (!r.narrowedBy.length) notes.push(`The walls leave only ${fmt(r.width)} between the ${entryShape.label} and ${r.label}.`);
+      if (!r.narrowedBy.length) {
+        const names = builtInBlame.get(r.targetId) ?? [];
+        const what = names.length ? `The ${listJoin(names)} ${names.length === 1 ? "leaves" : "leave"}` : "The walls leave";
+        notes.push(`${what} only ${fmt(r.width)} between the ${entryShape.label} and ${r.label}.`);
+      }
     }
     for (const [id, rs] of blamed) {
       const width = Math.min(...rs.map((r) => r.width));
@@ -197,7 +217,7 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
     notes.push(NO_ENTRY_NOTE);
   }
 
-  // Confidence: anything that depends on an inferred wall or unconfirmed opening.
+  // Confidence: anything that depends on an inferred wall, unconfirmed opening or built-in.
   const ws = walls(room);
   const verdicts: Verdict[] = placed.map((p) => {
     const rs = reasons.get(p.placement.id)!.sort((a, b) => a.tier - b.tier);
@@ -217,6 +237,12 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
         approximateReasons.push(`is near the ${o.label}, which hasn't been confirmed`);
       }
     }
+    for (const b of builtIns) {
+      if (b.builtIn.confirmed) continue;
+      if (Math.min(...p.polys.map((poly) => distPolyPoly(poly, b.polys[0]))) <= reach) {
+        approximateReasons.push(`is near the ${b.name}, which hasn't been confirmed`);
+      }
+    }
     return {
       placementId: p.placement.id,
       result,
@@ -231,6 +257,21 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
 
 export function worse(a: Result, b: Result): boolean {
   return RANK[a] > RANK[b];
+}
+
+/** Something a use zone or walkway can be blocked by: another piece or a built-in. */
+interface Obstacle {
+  name: string;
+  polys: Poly[];
+}
+
+interface BuiltInShape extends Obstacle {
+  id: string;
+  builtIn: BuiltIn;
+}
+
+function builtInShapes(room: Room): BuiltInShape[] {
+  return (room.builtIns ?? []).map((b) => ({ id: b.id, name: b.label || "built-in", builtIn: b, polys: [rectPoly(b.x, b.y, b.width, b.length)] }));
 }
 
 function listJoin(xs: string[]): string {
@@ -266,7 +307,7 @@ function nearestWall(v: Point, ws: ReturnType<typeof walls>) {
 }
 
 /** Largest depth (≤ the zone's) at which this side's strips are clear. */
-function clearDepth(p: PlacedItem, zone: ZoneShape, side: Side, outline: Poly, others: PlacedItem[]): number {
+function clearDepth(p: PlacedItem, zone: ZoneShape, side: Side, outline: Poly, others: Obstacle[]): number {
   const full = zone.sides.find((s) => s.side === side)!.polys;
   if (isClear(full, outline, others)) return zone.depth;
   const at = (d: number) => zoneRects(p.rects, side, d).map((r) => rectPoly(r.x, r.y, r.w, r.d).map(p.toWorld));
@@ -280,7 +321,7 @@ function clearDepth(p: PlacedItem, zone: ZoneShape, side: Side, outline: Poly, o
   return lo;
 }
 
-function isClear(polys: Poly[], outline: Poly, others: PlacedItem[]): boolean {
+function isClear(polys: Poly[], outline: Poly, others: Obstacle[]): boolean {
   for (const z of polys) {
     if (containment(z, outline) !== "inside") return false;
     for (const q of others) if (maxOverlap([z], q.polys) > 0) return false;
@@ -288,7 +329,7 @@ function isClear(polys: Poly[], outline: Poly, others: PlacedItem[]): boolean {
   return true;
 }
 
-function zoneBlockers(polys: Poly[], outline: Poly, others: PlacedItem[]): string[] {
+function zoneBlockers(polys: Poly[], outline: Poly, others: Obstacle[]): string[] {
   const out = new Set<string>();
   for (const z of polys) {
     if (containment(z, outline) !== "inside") out.add("wall");

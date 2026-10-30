@@ -42,6 +42,7 @@ interface PlanScore {
   dimsMissing: number;
   dimsWrongButFlagged: number;
   openingCountError: number;
+  builtInCountError: number;
   fixes: number;
   costUsd: number | null;
   latencyMs: number;
@@ -67,6 +68,7 @@ function scorePlan(truth: Truth, plan: DraftPlan, run: { costUsd: number | null;
     dimsMissing: 0,
     dimsWrongButFlagged: 0,
     openingCountError: 0,
+    builtInCountError: 0,
     fixes: 0,
     costUsd: run.costUsd,
     latencyMs: run.latencyMs,
@@ -83,6 +85,7 @@ function scorePlan(truth: Truth, plan: DraftPlan, run: { costUsd: number | null;
         s.dimsMissing++;
       }
       s.openingCountError += tr.doors + tr.windows + (tr.closets ?? 0);
+      s.builtInCountError += tr.built_ins ?? 0;
       continue;
     }
     unused.delete(idx);
@@ -116,11 +119,16 @@ function scorePlan(truth: Truth, plan: DraftPlan, run: { costUsd: number | null;
       (tr.closets === undefined ? 0 : Math.abs(closets - tr.closets));
     if (err) s.notes.push(`"${tr.name}": doors ${doors}/${tr.doors}, windows ${windows}/${tr.windows}`);
     s.openingCountError += err;
+
+    if (tr.built_ins !== undefined && got.builtIns.length !== tr.built_ins) {
+      s.notes.push(`"${tr.name}": built-ins ${got.builtIns.length}/${tr.built_ins}`);
+      s.builtInCountError += Math.abs(got.builtIns.length - tr.built_ins);
+    }
   }
 
   s.extraRooms = unused.size;
   for (const i of unused) s.notes.push(`extra room "${plan.rooms[i].name}"`);
-  s.fixes = s.truthRooms - s.foundRooms + s.extraRooms + s.dimsWrong + s.dimsMissing + s.openingCountError;
+  s.fixes = s.truthRooms - s.foundRooms + s.extraRooms + s.dimsWrong + s.dimsMissing + s.openingCountError + s.builtInCountError;
   return s;
 }
 
@@ -193,6 +201,7 @@ async function main() {
     `- Missing dimensions: ${sum("dimsMissing")}/${sum("dimsTotal")}`,
     `- Extra (hallucinated or split) rooms: ${sum("extraRooms")}`,
     `- Door/window/closet count errors: ${sum("openingCountError")}`,
+    `- Built-in count errors (rooms with \`built_ins\` labeled): ${sum("builtInCountError")}`,
     costs.length
       ? `- Cost per plan: avg $${(costs.reduce((a, b) => a + b, 0) / costs.length).toFixed(4)}, max $${Math.max(...costs).toFixed(4)}`
       : "- Cost per plan: n/a",

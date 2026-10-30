@@ -13,6 +13,8 @@ export const Truth = z.object({
       doors: z.number().int(),
       windows: z.number().int(),
       closets: z.number().int().optional(),
+      /** Kitchen islands, counter runs, fireplaces, radiators, tubs… Leave out to skip. */
+      built_ins: z.number().int().optional(),
     }),
   ),
 });

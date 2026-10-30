@@ -77,12 +77,14 @@ Without a key the server still starts; floor plan reading answers 503 with a pla
 
 | Tier | Rule | Result |
 | --- | --- | --- |
-| 0 | Crosses a wall or is outside the room; overlaps another piece; inside a door's swing arc or the strip kept clear in front of a doorway or closet | Doesn't fit |
-| 1 | A use zone (desk chair pull-out, dresser drawers, bed side access on at least one side, sofa legroom, dining chairs, wardrobe doors) is cut by a wall or another piece | Tight |
+| 0 | Crosses a wall or is outside the room; overlaps another piece or a built-in; inside a door's swing arc or the strip kept clear in front of a doorway or closet | Doesn't fit |
+| 1 | A use zone (desk chair pull-out, dresser drawers, bed side access on at least one side, sofa legroom, dining chairs, wardrobe doors) is cut by a wall, a built-in or another piece | Tight |
 | 2 | The walkway from the entry to another door or to a clear use zone is under the minimum (30 in) | Tight |
 | 3 | Suggestions | Never change a verdict |
 
-Verdicts that depend on an inferred wall or an unconfirmed door are marked **approximate**.
+Verdicts that depend on an inferred wall, an unconfirmed door or an unconfirmed built-in are marked **approximate**.
+
+**Built-ins** (`Room.builtIns`: kitchen islands, counters, radiators, fireplaces, tubs…) are axis-aligned rectangles in room coordinates. They block items (tier 0, `built-in`) and use zones (tier 1), are obstacles for the walkway, and snap like walls. They are never blamed for a narrow walkway: if only built-ins and walls narrow it, the room gets a note ("The counter leaves only 29 in between the entry door and the closet door").
 
 The golden cases in `src/engine/golden/cases/` were written before the engine (see the commit history) and are the Phase 1 gate. Their conventions are in [`src/engine/golden/README.md`](src/engine/golden/README.md).
 
@@ -104,15 +106,15 @@ picture ──resize to ≤1568 px──▶ POST /api/floorplan ──Claude─�
 listing text ──parseListingText──▶ draftFromText ───────────────────────────────────────────────▲
 ```
 
-- `src/import/reading.ts`: what Claude is asked for (`PlanReading`, structured output). It copies dimension labels verbatim and gives positions in image pixels. **It does no arithmetic.** The same prompt and schema are used by the Phase 0 test, so Phase 0 measures what ships.
+- `src/import/reading.ts`: what Claude is asked for (`PlanReading`, structured output). It copies dimension labels verbatim and gives positions in image pixels, including a pixel box for each built-in. **It does no arithmetic.** The same prompt and schema are used by the Phase 0 test, so Phase 0 measures what ships.
 - `src/import/labels.ts`: parses labels (`11'2" x 12'0"`, `12'10 x 10'`, `3.4 x 3.6 m`…) and listing text. Pure, tested.
-- `src/import/draft.ts`: scale = median px-per-inch over labeled rooms. A label's longer number goes to the longer drawn side. Unlabeled rooms are measured with the scale and tagged `inferred`. Labels more than 12% off the drawing's scale are flagged. Openings are converted from pixels to wall offsets, and all start unconfirmed.
-- `src/app/ConfirmPlan.tsx`: the reading drawn over the picture at the typed sizes, so a wrong number shows as an outline missing the walls. Every size is a typed field, with highlighted issues and doubtful openings. Per-wall source tags (`labeled` / `inferred` / `user-edited`) and "Looks right" turn an inferred size into `user-edited`. Confirming makes openings `confirmed`.
+- `src/import/draft.ts`: scale = median px-per-inch over labeled rooms. A label's longer number goes to the longer drawn side. Unlabeled rooms are measured with the scale and tagged `inferred`. Labels more than 12% off the drawing's scale are flagged. Openings are converted from pixels to wall offsets, and built-ins from pixel boxes to room inches (clipped to the room); all start unconfirmed.
+- `src/app/ConfirmPlan.tsx`: the reading drawn over the picture at the typed sizes, so a wrong number shows as an outline missing the walls. Every size is a typed field, with highlighted issues, doubtful openings and doubtful built-ins (drawn on the picture too). Per-wall source tags (`labeled` / `inferred` / `user-edited`) and "Looks right" turn an inferred size into `user-edited`. Confirming makes openings and built-ins `confirmed`.
 - `server/`: `index.ts` (API plus static files), `claude.ts` (shared structured-output call, model chosen per reading by `modelFor`; also used by Phase 0), `imageSize.ts`.
 - Pictures are kept in IndexedDB (`Space.sourceImage`), not localStorage.
 - Rooms from listing text set `Room.approximate`, which marks every verdict in them approximate.
 - Images are shrunk to 1568 px on the long side before sending, so the pixel positions Claude reports match the image the overlay draws on.
-- Not yet: PDF pages, non-rectangular rooms from images (the reading gives each room's bounding box), dragging doors on the overlay (positions are typed fields, as the spec asks).
+- Not yet: PDF pages, non-rectangular rooms from images (the reading gives each room's bounding box), angled or curved built-ins (planned as their bounding rectangle), dragging doors or built-ins on the overlay (positions are typed fields, as the spec asks).
 
 ## Furniture import (Phase 3)
 

@@ -2,7 +2,7 @@
 // Scale comes from labeled rooms and is applied to unlabeled ones (SPEC.md, "Floor
 // plan import"). Every number here is checked by a person before it's used.
 
-import type { Opening, Room, WallSource } from "../model/types.ts";
+import type { BuiltIn, Opening, Room, WallSource } from "../model/types.ts";
 import { parseDimensionLabel, type ListedRoom } from "./labels.ts";
 import type { PlanReading } from "./reading.ts";
 
@@ -33,6 +33,10 @@ export interface DraftRoom {
   issues: string[];
   /** Openings the reader wasn't sure about, by opening id. */
   doubtfulOpenings: string[];
+  /** Built-ins in room inches. All start unconfirmed. */
+  builtIns: BuiltIn[];
+  /** Built-ins the reader wasn't sure about, by id. */
+  doubtfulBuiltIns: string[];
   /** From listing text: real shape and door positions unknown. */
   approximate: boolean;
 }
@@ -102,7 +106,7 @@ export function draftFromReading(reading: PlanReading): DraftPlan {
     const sy = lab?.sy ?? pxPerInch;
     const openings: Opening[] = [];
     const doubtful: string[] = [];
-    const mine = reading.openings.filter((o) => o.room.trim().toLowerCase() === r.name.trim().toLowerCase());
+    const mine = reading.openings.filter((o) => sameRoom(o.room, r.name));
     for (const o of mine) {
       if (!sx || !sy || width === null || length === null) break;
       const op = toOpening(o, r.bbox_px, sx, sy, width, length);
@@ -112,6 +116,16 @@ export function draftFromReading(reading: PlanReading): DraftPlan {
     }
     // Doors first, so the first door (the default entry) is a real door.
     openings.sort((a, b) => rank(a) - rank(b));
+
+    const builtIns: BuiltIn[] = [];
+    const doubtfulBuiltIns: string[] = [];
+    for (const b of reading.built_ins.filter((b) => sameRoom(b.room, r.name))) {
+      if (!sx || !sy || width === null || length === null) break;
+      const bi = toBuiltIn(b, r.bbox_px, sx, sy, width, length);
+      if (!bi) continue;
+      builtIns.push(bi);
+      if (b.confidence !== "high") doubtfulBuiltIns.push(bi.id);
+    }
 
     return {
       key: key("room"),
@@ -126,14 +140,20 @@ export function draftFromReading(reading: PlanReading): DraftPlan {
       openings,
       issues,
       doubtfulOpenings: doubtful,
+      builtIns,
+      doubtfulBuiltIns,
       approximate: false,
     };
   });
 
-  const orphans = reading.openings.filter((o) => !reading.rooms.some((r) => r.name.trim().toLowerCase() === o.room.trim().toLowerCase()));
+  const orphans = reading.openings.filter((o) => !reading.rooms.some((r) => sameRoom(o.room, r.name)));
   if (orphans.length) notes.push(`${orphans.length} door(s) or window(s) couldn't be matched to a room; add them by hand if they matter.`);
+  const strays = reading.built_ins.filter((b) => !reading.rooms.some((r) => sameRoom(b.room, r.name)));
+  if (strays.length) notes.push(`${strays.length} built-in(s) couldn't be matched to a room; add them by hand if they matter.`);
   return { rooms, pxPerInch, notes };
 }
+
+const sameRoom = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 const rank = (o: Opening) => (o.type === "door" ? 0 : o.type === "passage" ? 1 : o.type === "closet_door" ? 2 : 3);
 
@@ -181,6 +201,16 @@ function toOpening(
   };
 }
 
+/** A built-in's pixel box in room inches, clipped to the room. Null if nothing is left. */
+function toBuiltIn(b: PlanReading["built_ins"][number], box: Box, sx: number, sy: number, width: number, length: number): BuiltIn | null {
+  const x0 = Math.max(0, Math.round((b.bbox_px.x - box.x) / sx));
+  const y0 = Math.max(0, Math.round((b.bbox_px.y - box.y) / sy));
+  const x1 = Math.min(width, Math.round((b.bbox_px.x + b.bbox_px.w - box.x) / sx));
+  const y1 = Math.min(length, Math.round((b.bbox_px.y + b.bbox_px.h - box.y) / sy));
+  if (x1 - x0 < 1 || y1 - y0 < 1) return null;
+  return { id: key("builtin"), label: b.label.trim() || "built-in", x: x0, y: y0, width: x1 - x0, length: y1 - y0, confirmed: false };
+}
+
 /** Rooms from listing text: sizes as written, no shape or door positions. */
 export function draftFromText(listed: ListedRoom[]): DraftPlan {
   return {
@@ -201,12 +231,14 @@ export function draftFromText(listed: ListedRoom[]): DraftPlan {
       openings: [],
       issues: [],
       doubtfulOpenings: [],
+      builtIns: [],
+      doubtfulBuiltIns: [],
       approximate: true,
     })),
   };
 }
 
-/** A confirmed draft room as a real room. Openings the person kept are now confirmed. */
+/** A confirmed draft room as a real room. Openings and built-ins the person kept are now confirmed. */
 export function draftToRoom(d: DraftRoom, id: string): Room {
   const w = d.width!;
   const l = d.length!;
@@ -221,6 +253,7 @@ export function draftToRoom(d: DraftRoom, id: string): Room {
     ],
     wallSources: [d.widthSource, d.lengthSource, d.widthSource, d.lengthSource],
     openings: d.openings.map((o) => ({ ...o, confirmed: true })),
+    ...(d.builtIns.length ? { builtIns: d.builtIns.map((b) => ({ ...b, confirmed: true })) } : {}),
     ...(d.approximate ? { approximate: true } : {}),
   };
 }

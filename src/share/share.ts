@@ -37,6 +37,10 @@ const RoomSchema = z
     outline: z.array(Point).min(3).max(64),
     wallSources: z.array(z.enum(["labeled", "inferred", "user-edited"])),
     openings: z.array(Opening).max(50),
+    builtIns: z
+      .array(z.object({ id: Id, label: Text, x: Num, y: Num, width: Len, length: Len, confirmed: z.boolean() }))
+      .max(50)
+      .optional(),
     approximate: z.boolean().optional(),
   })
   .refine((r) => r.wallSources.length === r.outline.length && r.openings.every((o) => o.wall < r.outline.length));

@@ -1,9 +1,9 @@
 import { useState, type Dispatch } from "react";
 import { loadImage, type PlanImage } from "../import/client.ts";
-import type { Opening, Room, Space } from "../model/types.ts";
+import type { BuiltIn, Opening, Room, Space } from "../model/types.ts";
 import type { Units } from "../model/units.ts";
 import { LengthInput } from "./LengthInput.tsx";
-import { newOpening, rectRoom, resizeRoom, roomSize, type Action } from "./store.ts";
+import { newBuiltIn, newOpening, rectRoom, resizeRoom, roomSize, type Action } from "./store.ts";
 
 const WALLS = ["Top", "Right", "Bottom", "Left"];
 const TYPES: { type: Opening["type"]; label: string }[] = [
@@ -76,6 +76,8 @@ function RoomEditor({ room, units, dispatch, canDelete }: { room: Room; units: U
   const size = roomSize(room);
   const update = (r: Room) => dispatch({ type: "updateRoom", room: r });
   const setOpening = (o: Opening) => update({ ...room, openings: room.openings.map((x) => (x.id === o.id ? o : x)) });
+  const builtIns = room.builtIns ?? [];
+  const setBuiltIns = (b: BuiltIn[]) => update({ ...room, builtIns: b });
 
   return (
     <>
@@ -115,6 +117,24 @@ function RoomEditor({ room, units, dispatch, canDelete }: { room: Room; units: U
             + {t.label}
           </button>
         ))}
+      </div>
+
+      <h3>Built-ins</h3>
+      <p className="hint">Things that can't be moved, like a kitchen island, counter, radiator or fireplace. Nothing can be placed on them.</p>
+      {builtIns.map((b) => (
+        <BuiltInEditor
+          key={b.id}
+          room={room}
+          builtIn={b}
+          units={units}
+          onChange={(nb) => setBuiltIns(builtIns.map((x) => (x.id === nb.id ? nb : x)))}
+          onDelete={() => setBuiltIns(builtIns.filter((x) => x.id !== b.id))}
+        />
+      ))}
+      <div className="row wrap">
+        <button className="secondary" onClick={() => setBuiltIns([...builtIns, newBuiltIn(room)])}>
+          + Built-in
+        </button>
       </div>
 
       {canDelete && (
@@ -251,6 +271,51 @@ export function OpeningEditor({ room, opening: o, units, onChange, onDelete, onM
           )}
         </div>
       )}
+    </fieldset>
+  );
+}
+
+export interface BuiltInProps {
+  room: Room;
+  builtIn: BuiltIn;
+  units: Units;
+  onChange: (b: BuiltIn) => void;
+  onDelete: () => void;
+  /** Highlight for review (the floor plan reader wasn't sure). */
+  doubtful?: boolean;
+}
+
+/** A built-in's name, position from the plan's top-left corner and size, kept inside the room. */
+export function BuiltInEditor({ room, builtIn: b, units, onChange, onDelete, doubtful }: BuiltInProps) {
+  const size = roomSize(room);
+  const set = (patch: Partial<BuiltIn>) => {
+    const next = { ...b, ...patch };
+    const width = Math.min(next.width, size.width);
+    const length = Math.min(next.length, size.length);
+    onChange({
+      ...next,
+      width,
+      length,
+      x: Math.max(0, Math.min(next.x, size.width - width)),
+      y: Math.max(0, Math.min(next.y, size.length - length)),
+    });
+  };
+  return (
+    <fieldset className={doubtful ? "opening doubtful" : "opening"}>
+      <legend>
+        <input type="text" aria-label="Built-in name" value={b.label} placeholder="e.g. Kitchen island" onChange={(e) => onChange({ ...b, label: e.target.value })} />
+        <button className="link" onClick={onDelete} aria-label="Remove">
+          Remove
+        </button>
+      </legend>
+      <div className="row">
+        <LengthInput label="From left wall" value={b.x} units={units} bare="in" onChange={(x) => set({ x })} />
+        <LengthInput label="From top wall" value={b.y} units={units} bare="in" onChange={(y) => set({ y })} />
+      </div>
+      <div className="row">
+        <LengthInput label="Width (left to right)" value={b.width} units={units} bare="in" min={1} onChange={(width) => set({ width })} />
+        <LengthInput label="Length (top to bottom)" value={b.length} units={units} bare="in" min={1} onChange={(length) => set({ length })} />
+      </div>
     </fieldset>
   );
 }

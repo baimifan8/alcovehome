@@ -144,6 +144,15 @@ export function PlanView({ room, items, placements, report, rules, units, select
       <polygon points={pts(room.outline)} className="walls" strokeWidth={WALL * 2} />
       <polygon points={pts(room.outline)} className="floor" />
 
+      {(room.builtIns ?? []).map((b) => (
+        <g key={b.id} className={`built-in${b.confirmed ? "" : " unconfirmed"}`}>
+          <rect x={b.x} y={b.y} width={b.width} height={b.length} />
+          <text x={b.x + b.width / 2} y={b.y + b.length / 2} className="built-in-label" transform={b.length > b.width * 1.5 ? `rotate(-90 ${b.x + b.width / 2} ${b.y + b.length / 2})` : undefined}>
+            {b.label}
+          </text>
+        </g>
+      ))}
+
       {walls(room).map((w) => {
         const mid = { x: (w.a.x + w.b.x) / 2 - w.inward.x * (WALL + 10), y: (w.a.y + w.b.y) / 2 - w.inward.y * (WALL + 10) };
         const vertical = Math.abs(w.dir.y) > 0.9;

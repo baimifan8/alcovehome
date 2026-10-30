@@ -1,4 +1,4 @@
-// Snapping while dragging: flush against walls and other items' edges. Works on
+// Snapping while dragging: flush against walls, built-ins and other items' edges. Works on
 // items and walls that are axis-aligned; anything rotated off-axis moves freely.
 
 import { bboxSize, walls, type PlacedItem } from "../engine/index.ts";
@@ -51,9 +51,11 @@ export function snap(room: Room, item: InventoryItem, p: Placement, others: Plac
     }
   }
 
-  for (const o of others) {
-    if (!axisAligned(o.placement.rotation)) continue;
-    const ob = boxOf(o.item, o.placement);
+  const boxes = [
+    ...others.filter((o) => axisAligned(o.placement.rotation)).map((o) => boxOf(o.item, o.placement)),
+    ...(room.builtIns ?? []).map((bi) => ({ minX: bi.x, minY: bi.y, maxX: bi.x + bi.width, maxY: bi.y + bi.length })),
+  ];
+  for (const ob of boxes) {
     if (overlaps(b.minY, b.maxY, ob.minY, ob.maxY)) {
       tryX(ob.maxX - b.minX);
       tryX(ob.minX - b.maxX);

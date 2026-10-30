@@ -13,5 +13,9 @@
     { "type": "closet_door", "room": "Closet", "wall": "top", "start_px": 515, "end_px": 615, "swing": "sliding", "hinge_at": "unknown", "confidence": "high" },
     { "type": "door", "room": "Bath", "wall": "top", "start_px": 650, "end_px": 725, "swing": "into_room", "hinge_at": "start", "confidence": "low" }
   ],
+  "built_ins": [
+    { "label": "fireplace", "room": "Living Room", "bbox_px": { "x": 435, "y": 150, "w": 60, "h": 120 }, "confidence": "high" },
+    { "label": "vanity", "room": "Bath", "bbox_px": { "x": 775, "y": 400, "w": 60, "h": 80 }, "confidence": "medium" }
+  ],
   "warnings": []
 }
