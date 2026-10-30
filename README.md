@@ -28,12 +28,13 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 - **See how sure each answer is.** If an answer depends on a wall size that was measured from the drawing rather than printed on the plan, it's marked as approximate.
 - **Share a plan.** Send someone a link and they see your rooms, where the furniture goes and whether each piece fits. They can look but not move anything, or save their own copy to try changes. The plan travels inside the link itself, so nothing is uploaded and nobody needs an account. The link shows the plan as it was when you shared it (share again after changes), and it doesn't include the original floor plan picture.
 - **Keep several listings.** Your furniture list is saved once and reused for every home you look at. The original floor plan picture is kept too, so you can look at it again.
+- **Time a test with someone new.** In Settings, start a timed run and hand over the device (or add ?timed to the end of the app's web address to start one straight away). The app notes how long each step takes, from adding a floor plan to the first fit answer, and counts clicks, without showing a clock to the person trying it. Afterwards, Settings shows each run against the 5-minute goal, step by step, ready to copy. Results stay on that device.
 - **Use it on your phone or computer.** It opens in a web browser, and you can add it to your home screen like an app. No sign-up. Your plans stay on your own device.
 
 ## What's coming next
 
 1. **Try the reading on real listings and real store pages.** Reading floor plans and store pages has been checked with samples, but not yet with real listings and stores. That needs access to the reading service, plus a set of real floor plans and store links.
-2. **Check the five-minute goal with real people.** A new person should get from a floor plan screenshot to a fit answer in under five minutes. Everything needed is in place, but it hasn't been timed with real users yet.
+2. **Check the five-minute goal with real people.** A new person should get from a floor plan screenshot to a fit answer in under five minutes. The app can now time this (see "Time a test with someone new" above); it hasn't been tried with real people yet.
 3. **Save furniture from a store page in one click**, with a browser add-on.
 
 ## Progress

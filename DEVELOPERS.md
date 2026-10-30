@@ -171,6 +171,15 @@ Space ──planToShare──▶ JSON ──deflate-raw──▶ base64url ─�
 - Saving a copy gives the space a new id. A shared item identical to one already in the recipient's inventory (same id and content, e.g. sharing to yourself) is reused; others get new ids so they can't clash with or overwrite the recipient's own furniture.
 - Links are snapshots; there's no live sync.
 
+## Timed test runs (Phase 3 gate)
+
+`src/app/timing.ts` times the spec's Phase 3 gate: a new user goes from screenshot to verdict in under 5 minutes.
+
+- Off unless started: Settings → "Start a timed run" (opens a new listing), or open the app with `?timed` (handy on a fresh device, where Settings isn't shown yet; the parameter is removed from the address).
+- Steps, each noted the first time it happens: floor plan added (picture/PDF prepared, listing text read, or a room typed), plan read (confirm screen), rooms confirmed, first furniture added, first fit answer. The run ends at the first verdict shown on a plan confirmed during the run; pointer presses are counted as clicks.
+- The person being tested sees only a "● Timed run" marker in the header, no clock.
+- Runs are kept in `localStorage` (`alcove-home:timing`) on that device and never sent anywhere. Settings lists them (green under 5 minutes, red over or stopped) with a plain-text report to copy.
+
 ## Not built yet
 
 The browser extension, round tables (planned as their bounding rectangle), accounts, and limits shared across several servers.
