@@ -6,7 +6,9 @@ import { isPdf, openPdf, prepareImage, readFloorPlan, type PdfPlan, type PlanIma
 import { draftFromReading, draftFromText, type DraftPlan } from "../import/draft.ts";
 import { parseListingText } from "../import/labels.ts";
 import type { Units } from "../model/units.ts";
+import { clampShape, type Notch, type RoomShape } from "../model/shape.ts";
 import { LengthInput } from "./LengthInput.tsx";
+import { ShapeFields } from "./RoomPanel.tsx";
 
 type Mode = "picture" | "text" | "type";
 
@@ -15,7 +17,7 @@ interface Props {
   hasSpaces: boolean;
   onCancel: () => void;
   /** Typed sizes: no review needed. */
-  onTyped: (name: string, roomName: string, width: number, length: number) => void;
+  onTyped: (name: string, roomName: string, shape: RoomShape) => void;
   /** A picture or text was read: review it on the confirm screen. */
   onDraft: (name: string, draft: DraftPlan, image: PlanImage | null) => void;
 }
@@ -51,7 +53,7 @@ export function NewListing({ units, hasSpaces, onCancel, onTyped, onDraft }: Pro
 
         {mode === "picture" && <PictureInput onRead={(draft, image) => onDraft(listing, draft, image)} />}
         {mode === "text" && <TextInput onRead={(draft) => onDraft(listing, draft, null)} />}
-        {mode === "type" && <TypedInput units={units} onCreate={(roomName, w, l) => onTyped(listing, roomName, w, l)} />}
+        {mode === "type" && <TypedInput units={units} onCreate={(roomName, shape) => onTyped(listing, roomName, shape)} />}
 
         {hasSpaces && (
           <button className="link" onClick={onCancel}>
@@ -240,15 +242,16 @@ function TextInput({ onRead }: { onRead: (draft: DraftPlan) => void }) {
   );
 }
 
-function TypedInput({ units, onCreate }: { units: Units; onCreate: (roomName: string, width: number, length: number) => void }) {
+function TypedInput({ units, onCreate }: { units: Units; onCreate: (roomName: string, shape: RoomShape) => void }) {
   const [roomName, setRoomName] = useState("Bedroom");
   const [width, setWidth] = useState(144);
   const [length, setLength] = useState(132);
+  const [notch, setNotch] = useState<Notch | null>(null);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onCreate(roomName.trim() || "Room", width, length);
+        onCreate(roomName.trim() || "Room", clampShape({ width, length, notch }));
       }}
     >
       <label className="field">
@@ -259,6 +262,7 @@ function TypedInput({ units, onCreate }: { units: Units; onCreate: (roomName: st
         <LengthInput label="Width (left to right)" value={width} units={units} bare="ft" min={24} onChange={setWidth} />
         <LengthInput label="Length (top to bottom)" value={length} units={units} bare="ft" min={24} onChange={setLength} />
       </div>
+      <ShapeFields shape={{ width, length, notch }} units={units} onChange={(s) => setNotch(s.notch)} />
       <button type="submit">Start plan</button>
     </form>
   );

@@ -1,7 +1,8 @@
 // App state, kept on the user's device (SPEC.md: v1 is local-first, no accounts).
 
-import { bboxSize, defaultRules, evaluateRoom, withClearances, type Rules } from "../engine/index.ts";
+import { bboxSize, defaultRules, evaluateRoom, walls, withClearances, type Rules } from "../engine/index.ts";
 import type { BuiltIn, InventoryItem, Opening, Placement, Room, Space } from "../model/types.ts";
+import { reshapeRoom, shapeOf, shapeOutline, wallRoles, type RoomShape } from "../model/shape.ts";
 import type { Units } from "../model/units.ts";
 
 export interface Settings {
@@ -57,19 +58,14 @@ export const newId = () =>
     : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 export function rectRoom(name: string, width: number, length: number, id = newId()): Room {
-  return {
-    id,
-    name,
-    outline: [
-      { x: 0, y: 0 },
-      { x: width, y: 0 },
-      { x: width, y: length },
-      { x: 0, y: length },
-    ],
-    // Typed by the user, so every wall is user-entered.
-    wallSources: ["user-edited", "user-edited", "user-edited", "user-edited"],
-    openings: [],
-  };
+  return shapedRoom(name, { width, length, notch: null }, id);
+}
+
+/** A typed room: a rectangle or an L (see model/shape.ts). */
+export function shapedRoom(name: string, shape: RoomShape, id = newId()): Room {
+  const { outline } = shapeOutline(shape);
+  // Typed by the user, so every wall is user-entered.
+  return { id, name, outline, wallSources: outline.map(() => "user-edited"), openings: [] };
 }
 
 export function roomSize(room: Room) {
@@ -78,35 +74,10 @@ export function roomSize(room: Room) {
   return { width: Math.max(...xs) - Math.min(...xs), length: Math.max(...ys) - Math.min(...ys) };
 }
 
-/**
- * Resize a rectangular room, keeping openings on their walls. A changed width marks
- * the top and bottom walls as user-edited; a changed length, the left and right.
- */
+/** Resize a room, keeping its shape (an L keeps its cut-out), openings and built-ins. */
 export function resizeRoom(room: Room, width: number, length: number): Room {
-  const old = roomSize(room);
-  const widthChanged = Math.abs(width - old.width) > 1e-9;
-  const lengthChanged = Math.abs(length - old.length) > 1e-9;
-  const src = room.wallSources;
-  const wallSources = [0, 1, 2, 3].map((i) =>
-    (i % 2 === 0 ? widthChanged : lengthChanged) ? "user-edited" : (src[i] ?? "user-edited"),
-  ) as Room["wallSources"];
-  const next = { ...rectRoom(room.name, width, length, room.id), wallSources, ...(room.approximate ? { approximate: true } : {}) };
-  const wallLen = (w: number, s: { width: number; length: number }) => (w % 2 === 0 ? s.width : s.length);
-  const openings = room.openings.map((o) => {
-    // Keep the distance from the plan's left/top corner the same.
-    const fromCorner = o.wall === 0 || o.wall === 1 ? o.offset : wallLen(o.wall, old) - o.offset - o.width;
-    const len = wallLen(o.wall, { width, length });
-    const width_ = Math.min(o.width, len);
-    const d = Math.max(0, Math.min(fromCorner, len - width_));
-    return { ...o, width: width_, offset: o.wall === 0 || o.wall === 1 ? d : len - d - width_ };
-  });
-  // Built-ins keep their spot, pulled back inside if the room got smaller.
-  const builtIns = room.builtIns?.map((b) => {
-    const w = Math.min(b.width, width);
-    const l = Math.min(b.length, length);
-    return { ...b, width: w, length: l, x: Math.max(0, Math.min(b.x, width - w)), y: Math.max(0, Math.min(b.y, length - l)) };
-  });
-  return { ...next, openings, ...(builtIns ? { builtIns } : {}) };
+  const shape = shapeOf(room);
+  return shape ? reshapeRoom(room, { ...shape, width, length }) : room;
 }
 
 export function newBuiltIn(room: Room): BuiltIn {
@@ -117,13 +88,18 @@ export function newBuiltIn(room: Room): BuiltIn {
 }
 
 export function newOpening(type: Opening["type"], room: Room): Opening {
-  const width = type === "closet_door" ? 48 : type === "window" ? 36 : type === "passage" ? 36 : 32;
-  const { width: w } = roomSize(room);
+  // Windows on the top wall, closets on the right, doors on the bottom (by role, so an L
+  // puts them on the same outer walls as a rectangle).
+  const role = type === "window" ? "top" : type === "closet_door" ? "right" : "bottom";
+  const wall = Math.max(0, wallRoles(room)?.indexOf(role) ?? (type === "window" ? 0 : type === "closet_door" ? 1 : 2));
+  // An L's walls can be short: keep the new opening on its wall.
+  const len = walls(room)[wall].length;
+  const width = Math.min(len, type === "closet_door" ? 48 : type === "window" ? 36 : type === "passage" ? 36 : 32);
   return {
     id: newId(),
     type,
-    wall: type === "window" ? 0 : type === "closet_door" ? 1 : 2,
-    offset: Math.max(0, Math.min(6, w - width)),
+    wall,
+    offset: Math.max(0, Math.min(6, len - width)),
     width,
     operation: type === "closet_door" ? "sliding" : "swing",
     swing: "in",

@@ -2,6 +2,7 @@
 // Scale comes from labeled rooms and is applied to unlabeled ones (SPEC.md, "Floor
 // plan import"). Every number here is checked by a person before it's used.
 
+import { clampShape, placeOnWall, shapeOutline, wallRunsForward, type Notch, type WallRole } from "../model/shape.ts";
 import type { BuiltIn, Opening, Room, WallSource } from "../model/types.ts";
 import { parseDimensionLabel, type ListedRoom } from "./labels.ts";
 import type { PlanReading } from "./reading.ts";
@@ -24,10 +25,14 @@ export interface DraftRoom {
   /** Source of the top and bottom walls (the width) and of the left and right walls (the length). */
   widthSource: WallSource;
   lengthSource: WallSource;
+  /** For an L-shaped room, the missing corner (inches), else null. */
+  notch: Notch | null;
+  /** Source of the two walls at an L's inside corner. */
+  notchSource: WallSource;
   labelText: string | null;
   /** Where the room is in the image, if it came from one. */
   bboxPx: Box | null;
-  /** Openings in room terms (inches from each wall's start). All start unconfirmed. */
+  /** Openings in room terms (wall index in draftRoomShape's outline, inches from the wall's start). All start unconfirmed. */
   openings: Opening[];
   /** Things a person should look at, shown highlighted. */
   issues: string[];
@@ -74,7 +79,10 @@ export function draftFromReading(reading: PlanReading): DraftPlan {
     const length = horizontalIsLong ? shortIn : longIn;
     return { width, length, sx: r.bbox_px.w / width, sy: r.bbox_px.h / length };
   });
-  const ratios = labeled.flatMap((l) => (l ? [l.sx, l.sy] : []));
+  // An L's label may give its overall size or just one arm, so rectangles set the scale
+  // when there are any.
+  const rect = labeled.filter((l, i) => l && !reading.rooms[i].notch_px);
+  const ratios = (rect.length ? rect : labeled).flatMap((l) => (l ? [l.sx, l.sy] : []));
   const pxPerInch = ratios.length ? median(ratios) : null;
   if (pxPerInch === null) notes.push("No room sizes could be read from the plan, so every size needs to be typed in.");
 
@@ -104,12 +112,18 @@ export function draftFromReading(reading: PlanReading): DraftPlan {
     // Pixel → inch for this room: its own labeled scale if it has one.
     const sx = lab?.sx ?? pxPerInch;
     const sy = lab?.sy ?? pxPerInch;
+    let notch: Notch | null = null;
+    if (r.notch_px && sx && sy && width !== null && length !== null) {
+      const corner = r.notch_px.corner.replace("_", "-") as Notch["corner"];
+      notch = clampShape({ width, length, notch: { corner, width: Math.round(r.notch_px.w / sx), length: Math.round(r.notch_px.h / sy) } }).notch;
+      if (notch) issues.push("This room is L-shaped. Its printed size was used as the overall size and the cut-out corner was measured from the drawing. Check both against the plan.");
+    }
     const openings: Opening[] = [];
     const doubtful: string[] = [];
     const mine = reading.openings.filter((o) => sameRoom(o.room, r.name));
     for (const o of mine) {
       if (!sx || !sy || width === null || length === null) break;
-      const op = toOpening(o, r.bbox_px, sx, sy, width, length);
+      const op = toOpening(o, r.bbox_px, sx, sy, { width, length, notch });
       if (!op) continue;
       openings.push(op);
       if (o.confidence !== "high" || o.swing === "unknown" || (o.type === "door" && o.hinge_at === "unknown")) doubtful.push(op.id);
@@ -135,6 +149,8 @@ export function draftFromReading(reading: PlanReading): DraftPlan {
       length,
       widthSource: source,
       lengthSource: source,
+      notch,
+      notchSource: "inferred",
       labelText: r.label_text,
       bboxPx: r.bbox_px,
       openings,
@@ -162,27 +178,24 @@ function toOpening(
   box: Box,
   sx: number,
   sy: number,
-  width: number,
-  length: number,
+  shape: { width: number; length: number; notch: Notch | null },
 ): Opening | null {
-  const horizontal = o.wall === "top" || o.wall === "bottom";
-  const scale = horizontal ? sx : sy;
+  const across = o.wall === "top" || o.wall === "bottom" || o.wall === "inner_across";
+  const scale = across ? sx : sy;
   const [lo, hi] = [Math.min(o.start_px, o.end_px), Math.max(o.start_px, o.end_px)];
-  const origin = horizontal ? box.x : box.y;
-  const wallLen = horizontal ? width : length;
-  // Inches from the plan's left (or top) corner of this wall.
-  let fromCorner = Math.round((lo - origin) / scale);
-  let w = Math.round((hi - lo) / scale);
+  const origin = across ? box.x : box.y;
+  const w = Math.round((hi - lo) / scale);
   if (w <= 0) return null;
-  w = Math.min(w, wallLen);
-  fromCorner = Math.max(0, Math.min(fromCorner, wallLen - w));
-  const wall = { top: 0, right: 1, bottom: 2, left: 3 }[o.wall];
-  // Walls 0 and 1 start at the plan's left/top corner; 2 and 3 at the opposite one.
-  const startsAtCorner = wall === 0 || wall === 1;
-  const offset = startsAtCorner ? fromCorner : wallLen - fromCorner - w;
-  // hinge_at "start" is the smaller pixel coordinate, i.e. the plan's left/top end.
-  const hingeNearCorner = o.hinge_at !== "end";
-  const hinge: Opening["hinge"] = hingeNearCorner === startsAtCorner ? "left" : "right";
+  const { outline, roles } = shapeOutline(shape);
+  const role: WallRole = { top: "top", right: "right", bottom: "bottom", left: "left", inner_across: "notch-across", inner_down: "notch-down" }[o.wall] as WallRole;
+  // An inner wall on a room read as a rectangle: put it on the nearest outer wall.
+  const index = roles.indexOf(role) >= 0 ? roles.indexOf(role) : roles.indexOf(role === "notch-across" ? "top" : "left");
+  // Inches from the plan's left (or top) edge of the room, then onto that wall.
+  const placed = placeOnWall(outline, index, Math.round((lo - origin) / scale), w);
+  // hinge_at "start" is the smaller pixel coordinate, i.e. the plan's left/top end;
+  // the model's "left" hinge is at the wall's start vertex.
+  const hingeNearEdge = o.hinge_at !== "end";
+  const hinge: Opening["hinge"] = hingeNearEdge === wallRunsForward(outline, index) ? "left" : "right";
 
   const type: Opening["type"] =
     o.type === "window" ? "window" : o.type === "open_passage" ? "passage" : o.type === "closet_door" ? "closet_door" : "door";
@@ -191,9 +204,7 @@ function toOpening(
   return {
     id: key("opening"),
     type,
-    wall,
-    offset,
-    width: w,
+    ...placed,
     operation,
     swing: o.swing === "out_of_room" ? "out" : "in",
     hinge,
@@ -226,6 +237,8 @@ export function draftFromText(listed: ListedRoom[]): DraftPlan {
       length: l.dims[1],
       widthSource: "labeled",
       lengthSource: "labeled",
+      notch: null,
+      notchSource: "labeled",
       labelText: l.text,
       bboxPx: null,
       openings: [],
@@ -238,20 +251,27 @@ export function draftFromText(listed: ListedRoom[]): DraftPlan {
   };
 }
 
+/** The draft as a room shape: its outline is what the draft's opening wall indices refer to. */
+export function draftRoomOutline(d: Pick<DraftRoom, "width" | "length" | "notch">, fallback = 120) {
+  return shapeOutline({ width: d.width ?? fallback, length: d.length ?? fallback, notch: d.notch });
+}
+
 /** A confirmed draft room as a real room. Openings and built-ins the person kept are now confirmed. */
 export function draftToRoom(d: DraftRoom, id: string): Room {
-  const w = d.width!;
-  const l = d.length!;
+  const { outline, roles } = draftRoomOutline(d);
+  const source: Record<WallRole, WallSource> = {
+    top: d.widthSource,
+    bottom: d.widthSource,
+    left: d.lengthSource,
+    right: d.lengthSource,
+    "notch-across": d.notchSource,
+    "notch-down": d.notchSource,
+  };
   return {
     id,
     name: d.name.trim() || "Room",
-    outline: [
-      { x: 0, y: 0 },
-      { x: w, y: 0 },
-      { x: w, y: l },
-      { x: 0, y: l },
-    ],
-    wallSources: [d.widthSource, d.lengthSource, d.widthSource, d.lengthSource],
+    outline,
+    wallSources: roles.map((r) => source[r]),
     openings: d.openings.map((o) => ({ ...o, confirmed: true })),
     ...(d.builtIns.length ? { builtIns: d.builtIns.map((b) => ({ ...b, confirmed: true })) } : {}),
     ...(d.approximate ? { approximate: true } : {}),

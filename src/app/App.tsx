@@ -13,7 +13,7 @@ import { RoomPanel } from "./RoomPanel.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { SharedPlanView } from "./SharedPlanView.tsx";
-import { findSpot, load, newId, rectRoom, reducer, rulesFor, save } from "./store.ts";
+import { findSpot, load, newId, reducer, rulesFor, save, shapedRoom } from "./store.ts";
 import { VerdictPanel } from "./VerdictPanel.tsx";
 
 export function App() {
@@ -144,8 +144,8 @@ export function App() {
         units={units}
         hasSpaces={state.spaces.length > 0}
         onCancel={() => setCreating(false)}
-        onTyped={(name, roomName, w, l) => {
-          dispatch({ type: "createSpace", name, rooms: [rectRoom(roomName, w, l)] });
+        onTyped={(name, roomName, shape) => {
+          dispatch({ type: "createSpace", name, rooms: [shapedRoom(roomName, shape)] });
           startPlan();
         }}
         onDraft={(name, draft, image) => setPending({ name, draft, image })}

@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 const Confidence = z.enum(["high", "medium", "low"]);
-const Wall = z.enum(["top", "right", "bottom", "left"]);
+const Wall = z.enum(["top", "right", "bottom", "left", "inner_across", "inner_down"]);
 
 export const PlanReading = z.object({
   units_seen: z.enum(["ft_in", "metric", "mixed", "none"]),
@@ -19,6 +19,10 @@ export const PlanReading = z.object({
       bbox_px: z
         .object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() })
         .describe("The room's inside wall-to-wall extent in image pixels, origin at the image's top-left."),
+      notch_px: z
+        .object({ corner: z.enum(["top_left", "top_right", "bottom_right", "bottom_left"]), w: z.number(), h: z.number() })
+        .nullable()
+        .describe("Only for an L-shaped room: the corner of bbox_px that isn't part of the room, and that missing rectangle's size in pixels. Null for a rectangular room."),
       confidence: Confidence,
     }),
   ),
@@ -26,7 +30,9 @@ export const PlanReading = z.object({
     z.object({
       type: z.enum(["door", "sliding_door", "closet_door", "window", "open_passage"]),
       room: z.string().describe("Name of the room it belongs to (for a door between rooms, the room it swings into)."),
-      wall: Wall.describe("Which side of that room's box it is on."),
+      wall: Wall.describe(
+        "Which wall it is on: a side of the room's box, or for an L-shaped room one of the two walls at the inside corner (inner_across runs left-right, inner_down runs top-bottom).",
+      ),
       start_px: z.number().describe("Where the opening starts along that wall, in image pixels: x for top/bottom walls, y for left/right walls."),
       end_px: z.number().describe("Where it ends, same axis as start_px."),
       swing: z.enum(["into_room", "out_of_room", "sliding", "none", "unknown"]),
@@ -56,6 +62,7 @@ Rules:
 - Copy each room's printed dimension label exactly as printed into label_text. Do not convert or compute anything.
 - Give positions in the image's own pixel coordinates (origin top-left). The image size is stated in the request.
 - bbox_px is the inside of the room's walls, not the wall lines themselves.
+- An L-shaped room is one room: give its overall bbox_px and the missing corner in notch_px. Use null for rectangles. Don't split an L into two rooms.
 - Doors: report the swing direction from the drawn arc and which end the hinge is at. Closet doors are closet_door; bifold or sliding closet doors use swing "sliding".
 - Built-ins are fixed things furniture can't be placed on: kitchen islands and peninsulas, counters and cabinet runs (one per straight run, appliances included), built-in shelving, desks or benches, fireplaces and hearths, radiators, columns, stairs, bathtubs, showers, vanities and toilets. Report each with its floor footprint. Don't report furniture drawn only for decoration (beds, sofas, tables, rugs).
 - Never invent a printed number. If a label is unreadable, say so in warnings and lower that room's confidence.
