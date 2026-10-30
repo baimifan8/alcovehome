@@ -827,3 +827,10 @@ fieldset.opening legend input[type="text"] {
   width: auto;
   max-width: 12rem;
 }
+
+/* Picking the floor plan page of a PDF */
+.pdf-pages {
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

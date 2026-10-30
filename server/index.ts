@@ -231,6 +231,7 @@ async function productDelete(req: IncomingMessage, res: ServerResponse) {
 const TYPES: Record<string, string> = {
   ".html": "text/html",
   ".js": "text/javascript",
+  ".mjs": "text/javascript",
   ".css": "text/css",
   ".svg": "image/svg+xml",
   ".png": "image/png",

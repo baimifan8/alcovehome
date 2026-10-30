@@ -12,7 +12,7 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 
 ## What you can do today
 
-- **Start from a floor plan picture.** Paste a screenshot of the listing's floor plan, drop in a picture, or pick one from your phone. The app reads the rooms, their sizes, where the doors and windows are, and fixed things like a kitchen island, counters, a fireplace or a radiator.
+- **Start from a floor plan picture or PDF.** Paste a screenshot of the listing's floor plan, drop in a picture or a PDF, or pick one from your phone. If the PDF has several pages, like a brochure, you pick the page with the floor plan. The app reads the rooms, their sizes, where the doors and windows are, and fixed things like a kitchen island, counters, a fireplace or a radiator.
 - **Check what it read.** You'll see the plan with the app's reading drawn on top. Every size is a box you can retype. Anything the app wasn't sure about is highlighted, and sizes that don't match the drawing are pointed out. You can add, move or remove doors, windows and fixed things before you continue.
 - **Or start from the listing's text.** Paste lines like "Bedroom 2: 11' x 12'" and the app makes a room from each one. These rooms don't include door positions, so their answers are marked as approximate.
 - **Or just type the room sizes**, in feet and inches or in centimeters.
@@ -41,7 +41,7 @@ Each answer comes with a plain reason, like *"the desk chair needs 3 feet behind
 | --- | --- | --- |
 | Experiments | Can a computer read floor plans and store pages well enough? | Ready to run, waiting on samples |
 | Room planner | Type room sizes, place furniture, get answers | ✅ Done and checked |
-| Floor plans from pictures | Paste a screenshot instead of typing, then check it | Built and checked with a sample plan; not yet tried on a real listing |
+| Floor plans from pictures | Paste a screenshot or PDF instead of typing, then check it | Built and checked with a sample plan; not yet tried on a real listing |
 | Furniture from store links | Paste a link (or a screenshot) instead of typing sizes; add extras | Built and checked with sample pages; not yet tried on real stores or timed with real users |
 | Sharing | Send someone a link to see your plan | ✅ Done and checked |
 
