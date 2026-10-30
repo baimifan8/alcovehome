@@ -62,6 +62,9 @@ export interface RoomReport {
 export const formatInches = (inches: number) => `${Math.round(inches)} in`;
 const RANK: Record<Result, number> = { fits: 0, tight: 1, "doesnt-fit": 2 };
 
+/** A tip for the plan's owner, not a finding: shared views leave it out. */
+export const NO_ENTRY_NOTE = "Add an entry door to check walkways.";
+
 export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOptions = {}): RoomReport {
   const { room } = input;
   const fmt = options.format ?? formatInches;
@@ -191,7 +194,7 @@ export function evaluateRoom(input: RoomInput, rules: Rules, options: EvaluateOp
     }
   }
   if (!options.skipWalkway && !entry && placed.length) {
-    notes.push("Add an entry door to check walkways.");
+    notes.push(NO_ENTRY_NOTE);
   }
 
   // Confidence: anything that depends on an inferred wall or unconfirmed opening.

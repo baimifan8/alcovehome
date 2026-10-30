@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { suggest, type RoomReport, type Rules, type Suggestion } from "../engine/index.ts";
+import { NO_ENTRY_NOTE, suggest, type RoomReport, type Rules, type Suggestion } from "../engine/index.ts";
 import type { InventoryItem, Placement, Result, Room } from "../model/types.ts";
 import { effectiveSize } from "../model/size.ts";
 import { formatLength, formatSize, type Units } from "../model/units.ts";
@@ -17,7 +17,7 @@ interface Props {
   onSelect: (id: string) => void;
   onMove: (p: Placement) => void;
   onRemove: (id: string) => void;
-  /** View only (a shared plan): no turning, removing or suggestions. */
+  /** View only (a shared plan): no turning, removing, suggestions or tips for the owner. */
   readOnly?: boolean;
 }
 
@@ -38,7 +38,7 @@ export function VerdictPanel({ room, items, placements, report, rules, units, se
           <span className="badge doesnt-fit">{counts["doesnt-fit"]} don't fit</span>
         </p>
       )}
-      {report.walkway.notes.map((n) => (
+      {report.walkway.notes.filter((n) => !(readOnly && n === NO_ENTRY_NOTE)).map((n) => (
         <p key={n} className="note">
           {n}
         </p>
